@@ -4,55 +4,127 @@ import { PowerBiTabs } from './components/PowerBiTabs';
 import { FileLoaderModal } from './components/FileLoaderModal';
 
 import { PageAvvisiV5 } from './components/pages/PageAvvisiV5';
+import { PageDashboardV5 } from './components/pages/PageDashboardV5';
+import { PageCercaSeTe } from './components/pages/PageCercaSeTe';
 import { PageAvvisiV3V4 } from './components/pages/PageAvvisiV3V4';
+import { PageFrequenzaV3V4, FrequenzaRow } from './components/pages/PageFrequenzaV3V4';
+import { PageDrillFrequenzaV3V4 } from './components/pages/PageDrillFrequenzaV3V4';
+import { PageDrillV5 } from './components/pages/PageDrillV5';
 import { PageAbbaco } from './components/pages/PageAbbaco';
-import { PageAnalisiFrequenza } from './components/pages/PageAnalisiFrequenza';
-import { PageDrillFrequenza } from './components/pages/PageDrillFrequenza';
-import { PageControlli1 } from './components/pages/PageControlli1';
-import { PageControlli2 } from './components/pages/PageControlli2';
-import { PagePagina1 } from './components/pages/PagePagina1';
+import { PageQuickUserGuide } from './components/pages/PageQuickUserGuide';
 
-import { Avviso, AbbacoItem, Iw67Item, ControlloAvvisoItem, OdlItem, PowerBiSectionId } from './types';
+import {
+  Avviso,
+  AbbacoItem,
+  Iw67Item,
+  ControlloAvvisoItem,
+  OdlItem,
+  PowerBiSectionId,
+  PdmV5Item
+} from './types';
 
-// Pre-extracted datasets
+// Pre-extracted certified test datasets for DOIT VE (available on-demand via Demo button)
+import { initialPdmV5List } from './data/v5Dataset';
 import initialAvvisi from './data/avvisi.json';
 import initialAbbaco from './data/abbaco.json';
 import initialIw67 from './data/iw67.json';
 import initialControlli from './data/controlli_sap.json';
 import initialOdl from './data/odl.json';
-import caorData from './data/caor.json';
 
 export const App: React.FC = () => {
   const [activeSection, setActiveSection] = useState<PowerBiSectionId>('avvisi_v5');
   const [isFileLoaderOpen, setIsFileLoaderOpen] = useState<boolean>(false);
 
-  // Datasets state
-  const [avvisi, setAvvisi] = useState<Avviso[]>(initialAvvisi as unknown as Avviso[]);
-  const [abbaco, setAbbaco] = useState<AbbacoItem[]>(initialAbbaco as unknown as AbbacoItem[]);
-  const [iw67, setIw67] = useState<Iw67Item[]>(initialIw67 as unknown as Iw67Item[]);
-  const [controlli, setControlli] = useState<ControlloAvvisoItem[]>(initialControlli as unknown as ControlloAvvisoItem[]);
-  const [odl, setOdl] = useState<OdlItem[]>(initialOdl as unknown as OdlItem[]);
-  const [caor] = useState<Record<string, { ore: number; data_prima: string; data_ultima: string }>>(
-    caorData as Record<string, { ore: number; data_prima: string; data_ultima: string }>
-  );
+  // Datasets start EMPTY by default as requested: no residual/mock data until files are provided or demo is clicked
+  const [pdmList, setPdmList] = useState<PdmV5Item[]>([]);
+  const [avvisi, setAvvisi] = useState<Avviso[]>([]);
+  const [abbaco, setAbbaco] = useState<AbbacoItem[]>([]);
+  const [iw67, setIw67] = useState<Iw67Item[]>([]);
+  const [controlli, setControlli] = useState<ControlloAvvisoItem[]>([]);
+  const [odl, setOdl] = useState<OdlItem[]>([]);
+
+  // Selected item state for drilldowns
+  const [selectedPdmItem, setSelectedPdmItem] = useState<PdmV5Item | undefined>(undefined);
+  const [selectedFreqRow, setSelectedFreqRow] = useState<FrequenzaRow | undefined>(undefined);
 
   const dataAggiornamento = '20/10/2026 15:47';
 
+  // Load certified demo data on demand
+  const handleLoadDemoData = () => {
+    setPdmList(initialPdmV5List);
+    setAvvisi(initialAvvisi as unknown as Avviso[]);
+    setAbbaco(initialAbbaco as unknown as AbbacoItem[]);
+    setIw67(initialIw67 as unknown as Iw67Item[]);
+    setControlli(initialControlli as unknown as ControlloAvvisoItem[]);
+    setOdl(initialOdl as unknown as OdlItem[]);
+    setSelectedPdmItem(initialPdmV5List[0]);
+  };
+
+  // Reset all datasets to empty
+  const handleClearAllData = () => {
+    setPdmList([]);
+    setAvvisi([]);
+    setAbbaco([]);
+    setIw67([]);
+    setControlli([]);
+    setOdl([]);
+    setSelectedPdmItem(undefined);
+    setSelectedFreqRow(undefined);
+  };
+
+  // Navigation handlers
+  const handleDrillPdm = (item: PdmV5Item) => {
+    setSelectedPdmItem(item);
+    setActiveSection('drill_v5');
+  };
+
+  const handleDrillFreq = (row: FrequenzaRow) => {
+    setSelectedFreqRow(row);
+    setActiveSection('drill_frequenza_v3v4');
+  };
+
+  const totalLoaded = pdmList.length + avvisi.length + iw67.length + abbaco.length + odl.length;
+
   return (
-    <div className="min-h-screen bg-[#e5e7eb] flex flex-col font-sans select-none">
+    <div className="min-h-screen bg-[#18191c] flex flex-col font-sans select-none text-slate-100">
       {/* Power BI Header with Manual File Loading Button */}
       <PowerBiHeader
         onOpenFileLoader={() => setIsFileLoaderOpen(true)}
         dataAggiornamento={dataAggiornamento}
-        totalRecords={avvisi.length + iw67.length + abbaco.length + controlli.length}
+        totalRecords={totalLoaded}
       />
 
       {/* Main Power BI Report Canvas */}
-      <main className="flex-1 max-w-[1600px] w-full mx-auto overflow-x-hidden">
+      <main className="flex-1 w-full mx-auto overflow-x-hidden bg-[#18191c]">
         {activeSection === 'avvisi_v5' && (
           <PageAvvisiV5
-            avvisi={avvisi}
+            pdmList={pdmList}
             dataAggiornamento={dataAggiornamento}
+            onNavigateToDrill={handleDrillPdm}
+            onOpenFileLoader={() => setIsFileLoaderOpen(true)}
+            onLoadDemoData={handleLoadDemoData}
+          />
+        )}
+
+        {activeSection === 'dashboard_v5' && (
+          <PageDashboardV5
+            pdmList={pdmList}
+            dataAggiornamento={dataAggiornamento}
+            onNavigateToDrill={handleDrillPdm}
+            onBack={() => setActiveSection('avvisi_v5')}
+            onOpenFileLoader={() => setIsFileLoaderOpen(true)}
+            onLoadDemoData={handleLoadDemoData}
+          />
+        )}
+
+        {activeSection === 'cerca_sete_v5' && (
+          <PageCercaSeTe
+            pdmList={pdmList}
+            dataAggiornamento={dataAggiornamento}
+            onNavigateToDrill={handleDrillPdm}
+            onBack={() => setActiveSection('avvisi_v5')}
+            onOpenFileLoader={() => setIsFileLoaderOpen(true)}
+            onLoadDemoData={handleLoadDemoData}
           />
         )}
 
@@ -61,55 +133,52 @@ export const App: React.FC = () => {
             iw67={iw67}
             avvisi={avvisi}
             dataAggiornamento={dataAggiornamento}
+            onOpenFileLoader={() => setIsFileLoaderOpen(true)}
+            onLoadDemoData={handleLoadDemoData}
           />
         )}
 
-        {activeSection === 'abbaco' && (
+        {activeSection === 'frequenza_v3v4' && (
+          <PageFrequenzaV3V4
+            iw67={iw67}
+            avvisi={avvisi}
+            dataAggiornamento={dataAggiornamento}
+            onNavigateToDrill={handleDrillFreq}
+            onOpenFileLoader={() => setIsFileLoaderOpen(true)}
+            onLoadDemoData={handleLoadDemoData}
+          />
+        )}
+
+        {activeSection === 'drill_frequenza_v3v4' && (
+          <PageDrillFrequenzaV3V4
+            selectedRow={selectedFreqRow}
+            iw67={iw67}
+            dataAggiornamento={dataAggiornamento}
+            onBack={() => setActiveSection('frequenza_v3v4')}
+          />
+        )}
+
+        {activeSection === 'drill_v5' && (
+          <PageDrillV5
+            selectedItem={selectedPdmItem}
+            pdmList={pdmList}
+            dataAggiornamento={dataAggiornamento}
+            onBack={() => setActiveSection('avvisi_v5')}
+          />
+        )}
+
+        {activeSection === 'abbattimento_codici' && (
           <PageAbbaco
             abbaco={abbaco}
             avvisi={avvisi}
             dataAggiornamento={dataAggiornamento}
+            onOpenFileLoader={() => setIsFileLoaderOpen(true)}
+            onLoadDemoData={handleLoadDemoData}
           />
         )}
 
-        {activeSection === 'analisi_frequenza' && (
-          <PageAnalisiFrequenza
-            iw67={iw67}
-            avvisi={avvisi}
-            dataAggiornamento={dataAggiornamento}
-            onNavigateToDrill={() => setActiveSection('drill_frequenza')}
-          />
-        )}
-
-        {activeSection === 'drill_frequenza' && (
-          <PageDrillFrequenza
-            iw67={iw67}
-            dataAggiornamento={dataAggiornamento}
-            onBack={() => setActiveSection('analisi_frequenza')}
-          />
-        )}
-
-        {activeSection === 'controlli_avvisi' && (
-          <PageControlli1
-            controlli={controlli}
-            caor={caor}
-            dataAggiornamento={dataAggiornamento}
-          />
-        )}
-
-        {activeSection === 'controlli_avvisi_2' && (
-          <PageControlli2
-            controlli={controlli}
-            caor={caor}
-            dataAggiornamento={dataAggiornamento}
-          />
-        )}
-
-        {activeSection === 'pagina_1' && (
-          <PagePagina1
-            avvisi={avvisi}
-            abbaco={abbaco}
-          />
+        {activeSection === 'quick_user_guide' && (
+          <PageQuickUserGuide />
         )}
       </main>
 
@@ -123,12 +192,16 @@ export const App: React.FC = () => {
       <FileLoaderModal
         isOpen={isFileLoaderOpen}
         onClose={() => setIsFileLoaderOpen(false)}
+        onUpdatePdm={setPdmList}
         onUpdateAvvisi={setAvvisi}
         onUpdateAbbaco={setAbbaco}
         onUpdateIw67={setIw67}
         onUpdateControlli={setControlli}
         onUpdateOdl={setOdl}
+        onLoadDemoData={handleLoadDemoData}
+        onClearAllData={handleClearAllData}
         counts={{
+          pdm: pdmList.length,
           avvisi: avvisi.length,
           abbaco: abbaco.length,
           iw67: iw67.length,

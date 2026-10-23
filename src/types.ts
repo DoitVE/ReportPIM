@@ -111,10 +111,88 @@ export type TabType =
 
 export type PowerBiSectionId =
   | 'avvisi_v5'
+  | 'dashboard_v5'
+  | 'cerca_sete_v5'
   | 'avvisi_v3v4'
-  | 'abbaco'
-  | 'analisi_frequenza'
-  | 'drill_frequenza'
-  | 'controlli_avvisi'
-  | 'controlli_avvisi_2'
-  | 'pagina_1';
+  | 'frequenza_v3v4'
+  | 'drill_frequenza_v3v4'
+  | 'drill_v5'
+  | 'abbattimento_codici'
+  | 'mappa_georeferenziata'
+  | 'quick_user_guide';
+
+export interface PdmV5Item {
+  pdm: string;
+  data_creazione: string;
+  data_scoperta: string;
+  tolto_dop: 'N' | 'S';
+  data_tolto_dop: string;
+  classe: 'A' | 'B' | 'C1' | 'C2' | 'C3' | 'MANCANTE' | 'S1' | 'S2' | string;
+  localita_tratta: string;
+  linea: string;
+  osservazioni: string;
+  avviso: string;
+  data_creaz_avviso: string;
+  km_linea: string;
+  tipo_difetto: string;
+  pos_difetto: string;
+  esegui_to_da: string;
+  id_sald: string;
+  gara_stato: string;
+  cod_stato: string;
+  scadenza: 'MANCANTE' | 'SCAD.<10GG' | 'SCAD.<30GG' | 'SCAD.<60GG' | 'SCAD.>60GG' | 'SCADUTO' | 'COMPLETATO' | string;
+  sede_tecnica: string;
+  divisione: 'VEM1' | 'VEM2' | string;
+  lvu: 'LVU1' | 'LVU2' | 'LVU3' | 'LVU4' | string;
+  classificazione_stato: 'Pdm aperto - Avv. aperto' | 'Pdm aperto - Avv. chiuso' | 'Pdm aperto - Avv. mancante' | 'Pdm chiuso - Avv. aperto' | 'Pdm mancante - Avv. aperto' | string;
+  fine_richiesta?: string;
+  ritardo_pdm?: string;
+  data_tolto_minore_scoperta?: boolean;
+  non_visibile_zstmaia?: boolean;
+  tolto_data_futura?: boolean;
+  avviso_chiuso?: boolean;
+  avviso_chiuso_con_odl?: boolean;
+  chiusura_ritardo?: boolean;
+  lat: number;
+  lng: number;
+
+  // Drill V5 specific properties
+  dev?: string;
+  bin?: string;
+  fila?: string;
+  tipo_arm?: string;
+  val_perc_mm?: string;
+  prof_dif?: string;
+  pos_dif?: string;
+  ubi_lin?: string;
+  t_tratta_ragg_fug?: string;
+  tipo_sald?: string;
+  data_esec_saldatura?: string;
+  pos_sezione?: string;
+  sald_in_gar?: string;
+  id_saldatore?: string;
+  creato_da?: string;
+  cod_linea?: string;
+}
+
+export interface AvvisoV5Detail {
+  avviso: string;
+  pdm?: string;
+  tipo: string;
+  descrizione: string;
+  autore: string;
+  data_creazione: string;
+  ultima_mod: string;
+  data_modifica: string;
+  sede_tecnica: string;
+  ordine: string;
+  network: string;
+  testo_esteso: string;
+  stato_sistema: string;
+  inizio_richiesta: string;
+  fine_richiesta: string;
+  data_chiusura: string;
+  ritardo_avv: string;
+  chiusura_minore_inizio?: boolean;
+  chiusura_futura?: boolean;
+}

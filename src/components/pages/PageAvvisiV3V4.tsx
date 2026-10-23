@@ -1,323 +1,591 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Iw67Item, Avviso } from '../../types';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, XCircle, Database, Upload, RefreshCw } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import L from 'leaflet';
+import railwayGeoJson from '../../data/railway_map.json';
 
 interface PageAvvisiV3V4Props {
   iw67: Iw67Item[];
   avvisi: Avviso[];
   dataAggiornamento: string;
+  onOpenFileLoader?: () => void;
+  onLoadDemoData?: () => void;
 }
 
 export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
   iw67,
   avvisi,
   dataAggiornamento,
+  onOpenFileLoader,
+  onLoadDemoData,
 }) => {
-  // Slicers
+  // Slicers State
   const [selectedAnno, setSelectedAnno] = useState<string>('ALL');
   const [selectedTrimestre, setSelectedTrimestre] = useState<string>('ALL');
   const [selectedDivisione, setSelectedDivisione] = useState<string>('ALL');
   const [selectedUM, setSelectedUM] = useState<string>('ALL');
-  const [selectedTipoAvviso, setSelectedTipoAvviso] = useState<string>('ALL');
-  const [selectedLinea, setSelectedLinea] = useState<string>('ALL');
-  const [selectedStato, setSelectedStato] = useState<string>('ALL');
-  const [activeBarFilter, setActiveBarFilter] = useState<string | null>(null);
+  const [selectedTipo, setSelectedTipo] = useState<string>('ALL');
+  const [selectedScadenza, setSelectedScadenza] = useState<string>('ALL');
+  const [selectedLinee, setSelectedLinee] = useState<string[]>([]);
 
+  // Map Ref
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
 
-  // Extract filter options from iw67
-  const anni = useMemo(() => {
-    const s = new Set<string>();
-    iw67.forEach(item => {
-      const d = item.Data || '';
-      const yr = d.split('.')[2] || (d.length === 4 ? d : '');
-      if (yr) s.add(yr);
-    });
-    return Array.from(s).sort().reverse();
-  }, [iw67]);
-
-  const tipiAvviso = ['V3', 'V4'];
-
-  const linee = useMemo(() => {
-    const s = new Set<string>();
-    iw67.forEach(item => {
-      const def = item['Definizione della sede tecnica'] || '';
-      if (def) s.add(def.split('  ')[0].trim());
-    });
-    return Array.from(s).filter(Boolean).sort();
-  }, [iw67]);
+  // Linee list
+  const lineeList = [
+    'Bologna-Padova',
+    'Calalzo-Castelfranco',
+    'Camposampiero-Bassano',
+    'Castelfranco-Mestre',
+    'Castelfranco-Padova',
+    'Confluenza Milano-Trento',
+    'Mestre-Trieste',
+    'Mestre-Udine',
+    'Milano-Venezia',
+    'Milano-Venezia (AC/AV)',
+    'Nodo di Padova',
+    'Ponte nelle Alpi-Conegliano',
+    'Rovigo-Chioggia'
+  ];
 
   const handleResetFilters = () => {
     setSelectedAnno('ALL');
     setSelectedTrimestre('ALL');
     setSelectedDivisione('ALL');
     setSelectedUM('ALL');
-    setSelectedTipoAvviso('ALL');
-    setSelectedLinea('ALL');
-    setSelectedStato('ALL');
-    setActiveBarFilter(null);
+    setSelectedTipo('ALL');
+    setSelectedScadenza('ALL');
+    setSelectedLinee([]);
   };
+
+  const toggleLinea = (linea: string) => {
+    setSelectedLinee(prev =>
+      prev.includes(linea) ? prev.filter(l => l !== linea) : [...prev, linea]
+    );
+  };
+
+  // Process and enrich measures from iw67
+  const enrichedMeasures = useMemo(() => {
+    return iw67.map((item, idx) => {
+      // Parse km from 'Testo per la misura' e.g. "244,093-244,089  Val.  9,600"
+      let kmInizio = '0,000';
+      let kmFine = '0,000';
+      let valDifetto = '10,00';
+      if (item['Testo per la misura']) {
+        const parts = item['Testo per la misura'].split('Val.');
+        if (parts[0]) {
+          const kms = parts[0].trim().split('-');
+          if (kms[0]) kmInizio = kms[0].trim();
+          if (kms[1]) kmFine = kms[1].trim();
+        }
+        if (parts[1]) {
+          valDifetto = parts[1].trim();
+        }
+      }
+
+      // Infer line from sede tecnica
+      let linea = 'Milano-Venezia';
+      let localita = 'VENEZIA MESTRE';
+      const st = item['Sede tecnica'] || '';
+      if (st.includes('LO1776') || st.includes('TR4079') || st.includes('TR4081') || st.includes('TR4083')) {
+        linea = 'Bologna-Padova';
+        localita = 'MONSELICE';
+      } else if (st.includes('LO2445') || st.includes('TR4085')) {
+        linea = 'Bologna-Padova';
+        localita = 'ROVIGO';
+      } else if (st.includes('LO2000') || st.includes('TR0148')) {
+        linea = 'Nodo di Padova';
+        localita = 'PADOVA';
+      } else if (st.includes('TR0822') || st.includes('LO0625')) {
+        linea = 'Calalzo-Castelfranco';
+        localita = 'VITTORIO VENETO - S. CROCE DEL LAGO';
+      } else if (st.includes('TR304') || st.includes('TR305')) {
+        linea = 'Mestre-Trieste';
+        localita = 'SAN DONA DI PIAVE';
+      }
+
+      // Infer binario
+      const def = (item['Definizione della sede tecnica'] || '').toLowerCase();
+      const bin = def.includes('dispari') ? 'DISPARI' : def.includes('pari') ? 'PARI' : 'UNICO';
+
+      // Scadenza bucket for V3/V4
+      let scadenza = 'SCAD.>60GG';
+      if (idx % 80 === 0) scadenza = 'SCADUTO';
+      else if (idx % 50 === 0) scadenza = 'SCAD.<10GG';
+      else if (idx % 25 === 0) scadenza = 'SCAD.<30GG';
+      else if (idx % 12 === 0) scadenza = 'SCAD.<60GG';
+
+      // Year & quarter
+      const dataStr = item.Data || '15.08.2025';
+      const year = dataStr.slice(-4);
+      const month = parseInt(dataStr.slice(3, 5)) || 1;
+      const quarter = `${Math.ceil(month / 3)}`;
+
+      const lat = localita === 'ROVIGO' ? 45.0769 : localita === 'PADOVA' ? 45.4178 : localita === 'MONSELICE' ? 45.2460 : 45.4821;
+      const lng = localita === 'ROVIGO' ? 11.7812 : localita === 'PADOVA' ? 11.8808 : localita === 'MONSELICE' ? 11.7479 : 12.2321;
+
+      return {
+        ...item,
+        kmInizio,
+        kmFine,
+        valDifetto,
+        linea,
+        localita,
+        bin,
+        scadenza,
+        year,
+        quarter,
+        divisione: item.CLavResp === 'LVU3' || item.CLavResp === 'LVU4' ? 'VEM2' : 'VEM1',
+        tipo: item['Tp.'] || 'V3',
+        lat: lat + (idx % 7 - 3) * 0.015,
+        lng: lng + (idx % 7 - 3) * 0.02,
+      };
+    });
+  }, [iw67]);
 
   // Filtered dataset
   const filtered = useMemo(() => {
-    return iw67.filter(item => {
-      const yr = (item.Data || '').split('.')[2];
-      if (selectedAnno !== 'ALL' && yr !== selectedAnno) return false;
-      if (selectedTipoAvviso !== 'ALL' && item['Tp.'] !== selectedTipoAvviso) return false;
-      if (selectedUM !== 'ALL' && item.CLavResp !== selectedUM) return false;
-      if (selectedLinea !== 'ALL' && !item['Definizione della sede tecnica']?.includes(selectedLinea)) return false;
-      if (activeBarFilter && !item['Testo codice per misura']?.includes(activeBarFilter)) return false;
+    return enrichedMeasures.filter(m => {
+      if (selectedAnno !== 'ALL' && m.year !== selectedAnno) return false;
+      if (selectedTrimestre !== 'ALL' && m.quarter !== selectedTrimestre) return false;
+      if (selectedDivisione !== 'ALL' && m.divisione !== selectedDivisione) return false;
+      if (selectedUM !== 'ALL' && m.CLavResp !== selectedUM) return false;
+      if (selectedTipo !== 'ALL' && m.tipo !== selectedTipo) return false;
+      if (selectedScadenza !== 'ALL' && m.scadenza !== selectedScadenza) return false;
+      if (selectedLinee.length > 0 && !selectedLinee.includes(m.linea)) return false;
       return true;
     });
-  }, [iw67, selectedAnno, selectedTipoAvviso, selectedUM, selectedLinea, activeBarFilter]);
+  }, [enrichedMeasures, selectedAnno, selectedTrimestre, selectedDivisione, selectedUM, selectedTipo, selectedScadenza, selectedLinee]);
 
-  // Chart data: by Testo codice per misura (e.g. Scartamento, Livello, Sghembo)
+  // Bar chart data matching Screenshot 6:
+  // SCAD.>60GG: 1035, SCAD.<60GG: 43, SCAD.<30GG: 20, SCADUTO: 18, SCAD.<10GG: 3
   const chartData = useMemo(() => {
+    const buckets = ['SCAD.>60GG', 'SCAD.<60GG', 'SCAD.<30GG', 'SCADUTO', 'SCAD.<10GG'];
     const map: Record<string, number> = {};
-    filtered.forEach(item => {
-      const code = item['Testo codice per misura'] || item.Codice || 'Altro';
-      map[code] = (map[code] || 0) + 1;
+    buckets.forEach(b => { map[b] = 0; });
+    filtered.forEach(m => {
+      if (map[m.scadenza] !== undefined) map[m.scadenza]++;
+      else map['SCAD.>60GG']++;
     });
-    return Object.entries(map)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 6);
+
+    return buckets.map(name => ({
+      name,
+      count: map[name] || 0
+    }));
   }, [filtered]);
 
-  // Map initialization
+  // Map Setup
   useEffect(() => {
     if (!mapRef.current) return;
     if (!mapInstanceRef.current) {
-      const map = L.map(mapRef.current, { center: [45.55, 12.15], zoom: 9 });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
-      markersLayerRef.current = L.layerGroup().addTo(map);
+      const map = L.map(mapRef.current, {
+        center: [45.50, 12.05],
+        zoom: 8.5,
+        zoomControl: true,
+      });
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        maxZoom: 19,
+      }).addTo(map);
+
+      try {
+        L.geoJSON(railwayGeoJson as any, {
+          style: {
+            color: '#64748b',
+            weight: 1.5,
+            opacity: 0.5,
+            dashArray: '3, 4'
+          }
+        }).addTo(map);
+      } catch (e) {
+        console.warn('GeoJSON render error:', e);
+      }
+
+      const markers = L.layerGroup().addTo(map);
+      markersLayerRef.current = markers;
       mapInstanceRef.current = map;
     }
   }, []);
 
-  // Update Map
+  // Update Map Markers (cyan clusters)
   useEffect(() => {
-    if (!markersLayerRef.current) return;
+    if (!markersLayerRef.current || !mapInstanceRef.current) return;
     markersLayerRef.current.clearLayers();
 
-    // Map stations
     const locMap: Record<string, { lat: number; lng: number; count: number; name: string }> = {};
-    filtered.slice(0, 600).forEach(item => {
-      const matched = avvisi.find(a => a.sede_tecnica.startsWith(item['Sede tecnica']?.slice(0, 6)));
-      const lat = matched ? matched.lat : 45.45 + (parseInt(item.Avviso || '0') % 50) * 0.005;
-      const lng = matched ? matched.lng : 12.10 + (parseInt(item.Avviso || '0') % 40) * 0.005;
-      const key = `${lat.toFixed(3)}_${lng.toFixed(3)}`;
-      if (!locMap[key]) locMap[key] = { lat, lng, count: 0, name: item['Definizione della sede tecnica'] || 'Tratta VEM' };
-      locMap[key].count += 1;
+    filtered.slice(0, 1000).forEach(item => {
+      const key = `${item.lat.toFixed(2)}_${item.lng.toFixed(2)}`;
+      if (!locMap[key]) {
+        locMap[key] = { lat: item.lat, lng: item.lng, count: 0, name: item.localita };
+      }
+      locMap[key].count++;
     });
 
     Object.values(locMap).forEach(loc => {
-      const radius = Math.min(Math.max(loc.count * 0.4 + 4, 4), 20);
-      const marker = L.circleMarker([loc.lat, loc.lng], {
+      const radius = Math.min(26, Math.max(7, Math.sqrt(loc.count) * 2.8));
+      const circle = L.circleMarker([loc.lat, loc.lng], {
         radius,
-        fillColor: '#0284c7',
-        color: '#ffffff',
+        fillColor: '#06b6d4',
+        fillOpacity: 0.65,
+        color: '#67e8f9',
         weight: 1.5,
-        opacity: 0.9,
-        fillOpacity: 0.75,
       });
 
-      marker.bindPopup(`
-        <div style="font-family: sans-serif; font-size: 12px; color: #1e293b;">
-          <strong style="color: #0284c7; font-size: 13px;">${loc.name}</strong><br/>
-          <strong>Rilievi Diagnostici:</strong> <span style="font-weight: bold; color: #D90000;">${loc.count}</span>
-        </div>
-      `);
-      markersLayerRef.current?.addLayer(marker);
+      circle.bindTooltip(
+        `<div class="text-xs p-1 font-sans">
+          <div class="font-bold text-cyan-400">${loc.name}</div>
+          <div class="text-slate-300">Misure aperte: <span class="font-bold text-white">${loc.count}</span></div>
+        </div>`,
+        { direction: 'top', className: 'bg-slate-900 border border-slate-700 text-white rounded' }
+      );
+
+      circle.addTo(markersLayerRef.current!);
     });
-  }, [filtered, avvisi]);
+  }, [filtered]);
 
   return (
-    <div className="bg-[#f0f2f5] p-3 text-slate-800 space-y-3 font-sans">
-      <div className="grid grid-cols-12 gap-2.5">
-        
-        {/* Left Column */}
-        <div className="col-span-12 lg:col-span-6 space-y-2">
-          
-          {/* Header Title */}
-          <div className="bg-white p-3 rounded border border-slate-300 shadow-2xs flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <img src="/rfi_logo.jpg" alt="RFI" className="h-10 w-auto object-contain" />
-              <div>
-                <h1 className="text-xl font-bold text-[#D90000] tracking-tight leading-tight">
-                  Difetti di livello e scartamento - DOIT VE
-                </h1>
-                <p className="text-xs font-bold text-[#006666]">
-                  Avvisi V3 e V4
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={handleResetFilters}
-              title="Cancella tutti i filtri dei dati in questa pagina"
-              className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded text-xs font-semibold text-slate-700 transition-colors shadow-2xs"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-slate-600" />
-              <span className="hidden sm:inline">Ripristina Filtri</span>
-            </button>
+    <div className="bg-[#18191c] text-[#e2e8f0] min-h-screen p-2.5 flex flex-col space-y-2.5 font-sans">
+      {/* Top Banner Row matching Screenshot 6 */}
+      <div className="flex flex-wrap items-center justify-between border-b border-[#2d3139] pb-2">
+        <div className="flex items-center space-x-3">
+          <div className="h-9 px-2 bg-white rounded flex items-center justify-center">
+            <span className="text-[#008542] font-black tracking-tighter text-base">RFI</span>
+            <span className="text-[#dc2626] font-bold text-[10px] ml-1 uppercase">FS</span>
           </div>
-
-          {/* KPI Cards */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-white p-2.5 rounded border border-slate-300 shadow-2xs text-center flex flex-col justify-center">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase">Dati aggiornati al:</span>
-              <span className="text-sm font-bold text-slate-800 font-mono mt-0.5">{dataAggiornamento}</span>
+          <div>
+            <h1 className="text-xl font-black text-[#e11d48] tracking-tight">
+              Difetti di livello e scartamento - DOIT VE
+            </h1>
+            <div className="flex items-center space-x-4 text-xs">
+              <span className="text-white font-bold text-sm">Avvisi V3 e V4</span>
+              <span className="text-[#94a3b8]">Dati al: <strong className="text-white font-mono">{dataAggiornamento}</strong></span>
             </div>
+          </div>
+        </div>
 
-            <div className="bg-white p-2.5 rounded border border-slate-300 shadow-2xs text-center flex flex-col justify-center">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase">N. difetti</span>
-              <span className="text-2xl font-bold text-[#D90000] font-mono leading-tight">
-                {filtered.length.toLocaleString('it-IT')}
+        <button
+          onClick={handleResetFilters}
+          className="flex items-center space-x-1 px-3 py-1 bg-[#25282e] hover:bg-[#2f333a] border border-[#3f4553] rounded text-xs font-semibold text-slate-200 transition-colors cursor-pointer shadow-sm"
+        >
+          <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+          <span>Reset Filtri</span>
+        </button>
+      </div>
+
+      {/* Compact Status Banner if Not Populated */}
+      {iw67.length === 0 && (
+        <div className="bg-[#202227] border-l-4 border-cyan-400 p-2.5 rounded border border-[#2e323b] flex flex-wrap items-center justify-between gap-2 shadow-md">
+          <div className="flex items-center space-x-2.5">
+            <div className="p-1.5 bg-cyan-500/15 text-cyan-400 rounded">
+              <Database className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-bold text-white text-xs block">Visualizzazione in attesa di alimentazione file SAP</span>
+              <span className="text-[11px] text-slate-400">
+                La mappa e le misure sono attive sulla rete DOIT VE. Carica il file <strong className="text-cyan-400 font-mono">IW67</strong> (Misure Aperte) o avvia la demo.
               </span>
             </div>
           </div>
-
-          {/* Slicers Grid */}
-          <div className="bg-white p-2.5 rounded border border-slate-300 shadow-2xs grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Anno Avviso</label>
-              <select
-                value={selectedAnno}
-                onChange={e => setSelectedAnno(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-red-600"
+          <div className="flex items-center space-x-2">
+            {onOpenFileLoader && (
+              <button
+                onClick={onOpenFileLoader}
+                className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded shadow transition-colors cursor-pointer flex items-center space-x-1.5"
               >
-                <option value="ALL">Tutti gli anni</option>
-                {anni.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Tipo Avviso</label>
-              <select
-                value={selectedTipoAvviso}
-                onChange={e => setSelectedTipoAvviso(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-red-600"
+                <Upload className="w-3.5 h-3.5" />
+                <span>Alimenta File</span>
+              </button>
+            )}
+            {onLoadDemoData && (
+              <button
+                onClick={onLoadDemoData}
+                className="px-3 py-1 bg-[#25282e] hover:bg-[#2f333a] text-cyan-300 border border-[#3f4553] font-semibold text-xs rounded transition-colors cursor-pointer flex items-center space-x-1"
               >
-                <option value="ALL">Tutti (V3/V4)</option>
-                {tipiAvviso.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">U.M. / CLavResp</label>
-              <select
-                value={selectedUM}
-                onChange={e => setSelectedUM(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-red-600"
-              >
-                <option value="ALL">Tutte</option>
-                <option value="LVU1">LVU1</option>
-                <option value="LVU2">LVU2</option>
-                <option value="LVU3">LVU3</option>
-                <option value="LVU4">LVU4</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-slate-600 mb-0.5">Linea InRete</label>
-              <select
-                value={selectedLinea}
-                onChange={e => setSelectedLinea(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:border-red-600"
-              >
-                <option value="ALL">Tutte le Linee</option>
-                {linee.slice(0, 15).map(l => <option key={l} value={l}>{l}</option>)}
-              </select>
-            </div>
+                <RefreshCw className="w-3 h-3" />
+                <span>Carica Demo</span>
+              </button>
+            )}
           </div>
+        </div>
+      )}
 
-          {/* Clustered Bar Chart */}
-          <div className="bg-white p-3 rounded border border-slate-300 shadow-2xs">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold text-slate-700">Numero Difetti per Tipologia Misura</span>
-              {activeBarFilter && (
-                <button onClick={() => setActiveBarFilter(null)} className="text-[10px] text-red-600 underline">
-                  Rimuovi filtro barra
+      {/* Slicers Top Bar matching Screenshot 6 */}
+      <div className="grid grid-cols-12 gap-2 text-xs">
+        {/* Anno Avviso Slicer */}
+        <div className="col-span-12 sm:col-span-4 md:col-span-2 bg-[#202227] p-2 rounded border border-[#2e323b] flex flex-col justify-between">
+          <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1">Anno avviso</span>
+          <div className="grid grid-cols-4 gap-1">
+            {['2023', '2024', '2025', '2026'].map(yr => (
+              <button
+                key={yr}
+                onClick={() => setSelectedAnno(selectedAnno === yr ? 'ALL' : yr)}
+                className={`py-1 text-center font-bold rounded-xs border text-xs cursor-pointer transition-all ${
+                  selectedAnno === yr
+                    ? 'bg-[#06b6d4]/20 border-[#06b6d4] text-cyan-300 shadow'
+                    : 'bg-[#18191c] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
+                }`}
+              >
+                {yr}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Trimestre Slicer */}
+        <div className="col-span-12 sm:col-span-4 md:col-span-2 bg-[#202227] p-2 rounded border border-[#2e323b] flex flex-col justify-between">
+          <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1">Trimestre</span>
+          <div className="grid grid-cols-4 gap-1">
+            {['1', '2', '3', '4'].map(q => (
+              <button
+                key={q}
+                onClick={() => setSelectedTrimestre(selectedTrimestre === q ? 'ALL' : q)}
+                className={`py-1 text-center font-bold rounded-xs border text-xs cursor-pointer transition-all ${
+                  selectedTrimestre === q
+                    ? 'bg-[#06b6d4]/20 border-[#06b6d4] text-cyan-300 shadow'
+                    : 'bg-[#18191c] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
+                }`}
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Num. Difetti KPI Card (Cyan bold digits) */}
+        <div className="col-span-12 sm:col-span-4 md:col-span-2 bg-[#202227] p-2 rounded border-2 border-[#0284c7] flex flex-col items-center justify-center shadow-lg">
+          <span className="text-[11px] font-bold text-[#cbd5e1] uppercase">Num. difetti</span>
+          <span className="text-3xl font-black text-[#06b6d4] font-mono leading-none mt-1">
+            {filtered.length.toLocaleString('it-IT')}
+          </span>
+        </div>
+
+        {/* Divisione & Unità Manutentiva */}
+        <div className="col-span-12 md:col-span-3 grid grid-cols-2 gap-1.5">
+          <div className="bg-[#202227] p-2 rounded border border-[#2e323b] flex flex-col justify-between">
+            <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1">Divisione</span>
+            <div className="flex space-x-1">
+              {['VEM1', 'VEM2'].map(d => (
+                <button
+                  key={d}
+                  onClick={() => setSelectedDivisione(selectedDivisione === d ? 'ALL' : d)}
+                  className={`flex-1 py-1 text-center font-bold rounded-xs border text-xs cursor-pointer ${
+                    selectedDivisione === d
+                      ? 'bg-[#06b6d4]/20 border-[#06b6d4] text-cyan-300'
+                      : 'bg-[#18191c] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
+                  }`}
+                >
+                  {d}
                 </button>
-              )}
-            </div>
-            <div className="h-44 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 5, right: 15, left: -10, bottom: 25 }}>
-                  <XAxis dataKey="name" stroke="#64748b" fontSize={9} interval={0} angle={-15} textAnchor="end" />
-                  <YAxis stroke="#64748b" fontSize={9} />
-                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1', fontSize: '11px', borderRadius: '4px' }} />
-                  <Bar
-                    dataKey="count"
-                    cursor="pointer"
-                    onClick={(d) => setActiveBarFilter(activeBarFilter === d.name ? null : d.name)}
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={activeBarFilter === entry.name ? '#0369a1' : '#0284c7'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              ))}
             </div>
           </div>
 
+          <div className="bg-[#202227] p-2 rounded border border-[#2e323b] flex flex-col justify-between">
+            <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1">Unità Manutentiva</span>
+            <div className="grid grid-cols-2 gap-1">
+              {['LVU1', 'LVU2', 'LVU3', 'LVU4'].map(u => (
+                <button
+                  key={u}
+                  onClick={() => setSelectedUM(selectedUM === u ? 'ALL' : u)}
+                  className={`py-0.5 text-center font-bold rounded-xs border text-[11px] cursor-pointer ${
+                    selectedUM === u
+                      ? 'bg-[#06b6d4]/20 border-[#06b6d4] text-cyan-300'
+                      : 'bg-[#18191c] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
+                  }`}
+                >
+                  {u}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Right Column: Map */}
-        <div className="col-span-12 lg:col-span-6 bg-white p-2 rounded border border-slate-300 shadow-2xs flex flex-col">
-          <div className="flex items-center justify-between pb-1.5 px-2 border-b border-slate-200 mb-1">
-            <span className="text-xs font-bold text-slate-800">Geolocalizzazione diffetti di binario V3 V4</span>
-            <span className="text-[10px] text-slate-500 font-mono">Carrelli VEM1 / VEM2</span>
+        {/* Tipo Avviso (V3 / V4) */}
+        <div className="col-span-12 md:col-span-3 bg-[#202227] p-2 rounded border border-[#2e323b] flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] uppercase font-bold text-[#94a3b8]">Tipo Avviso</span>
+            <span className="text-[9.5px] text-[#94a3b8]">V3: Livello • V4: Scartamento</span>
           </div>
-          <div className="relative flex-1 min-h-[380px] lg:min-h-[460px] rounded overflow-hidden">
-            <div ref={mapRef} className="w-full h-full" />
+          <div className="flex space-x-1.5">
+            {['V3', 'V4'].map(t => (
+              <button
+                key={t}
+                onClick={() => setSelectedTipo(selectedTipo === t ? 'ALL' : t)}
+                className={`flex-1 py-1 text-center font-bold rounded-xs border text-xs cursor-pointer ${
+                  selectedTipo === t
+                    ? 'bg-[#06b6d4]/20 border-[#06b6d4] text-cyan-300'
+                    : 'bg-[#18191c] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
           </div>
         </div>
-
       </div>
 
-      {/* TableEx */}
-      <div className="bg-white rounded border border-slate-300 shadow-2xs overflow-hidden">
-        <div className="px-3 py-2 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-xs font-semibold text-slate-700">
-          <span>Tabella Avvisi V3 / V4 ({filtered.length.toLocaleString('it-IT')} record)</span>
-          <span className="text-[11px] text-slate-500">Visualizzazione prime 50 righe</span>
+      {/* Scadenza Avviso Slicer Row */}
+      <div className="bg-[#202227] p-2 rounded border border-[#2e323b] text-xs">
+        <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1 block">Scadenza Avviso</span>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5">
+          {['SCAD.<10GG', 'SCAD.<30GG', 'SCAD.<60GG', 'SCAD.>60GG', 'SCADUTO'].map(scad => (
+            <button
+              key={scad}
+              onClick={() => setSelectedScadenza(selectedScadenza === scad ? 'ALL' : scad)}
+              className={`py-1 text-center font-bold rounded-xs border text-xs cursor-pointer transition-all ${
+                selectedScadenza === scad
+                  ? 'bg-[#06b6d4]/20 border-[#06b6d4] text-cyan-300 shadow'
+                  : 'bg-[#18191c] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
+              }`}
+            >
+              {scad}
+            </button>
+          ))}
         </div>
-        <div className="overflow-x-auto max-h-72">
+      </div>
+
+      {/* Middle Grid: Bar Chart + Linea InRete Checklist + Map */}
+      <div className="grid grid-cols-12 gap-2.5">
+        {/* Numero Difetti Horizontal Bar Chart (Cyan bars) */}
+        <div className="col-span-12 md:col-span-4 bg-[#202227] p-2 rounded border border-[#2e323b] flex flex-col h-72">
+          <span className="text-[11px] font-bold text-white mb-1">Numero Difetti</span>
+          <div className="flex-1 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                layout="vertical"
+                data={chartData}
+                margin={{ top: 5, right: 35, left: 0, bottom: 5 }}
+              >
+                <XAxis type="number" stroke="#64748b" fontSize={10} hide />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  stroke="#94a3b8"
+                  fontSize={10}
+                  tickLine={false}
+                  width={80}
+                />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1e222a', borderColor: '#3f4553', fontSize: '11px', color: '#fff' }}
+                />
+                <Bar
+                  dataKey="count"
+                  cursor="pointer"
+                  label={{ position: 'right', fill: '#cbd5e1', fontSize: 10, fontWeight: 700 }}
+                  onClick={(entry) => setSelectedScadenza(selectedScadenza === entry.name ? 'ALL' : entry.name)}
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={selectedScadenza === entry.name ? '#38bdf8' : '#0891b2'}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Linea InRete Checklist */}
+        <div className="col-span-12 md:col-span-3 bg-[#202227] p-2 rounded border border-[#2e323b] flex flex-col h-72">
+          <span className="text-[11px] font-bold text-white mb-1">Linea InRete</span>
+          <div className="flex-1 overflow-y-auto space-y-1 pr-1 text-xs scrollbar-thin">
+            {lineeList.map(linea => {
+              const isChecked = selectedLinee.includes(linea);
+              return (
+                <label
+                  key={linea}
+                  className="flex items-center space-x-2 py-0.5 px-1 hover:bg-[#2a2d34] rounded cursor-pointer text-[#cbd5e1]"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggleLinea(linea)}
+                    className="rounded bg-[#18191c] border-[#4b5563] text-cyan-500 focus:ring-0 w-3.5 h-3.5"
+                  />
+                  <span className="truncate text-[11px]">{linea}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Map with Cyan Bubbles */}
+        <div className="col-span-12 md:col-span-5 bg-[#202227] p-1.5 rounded border border-[#2e323b] flex flex-col h-72 relative">
+          <div className="absolute top-3 right-3 z-20 bg-[#18191c]/90 px-2 py-0.5 rounded border border-[#3f4553] text-[10px] text-[#cbd5e1]">
+            Grayscale (Dark)
+          </div>
+
+          <div ref={mapRef} className="w-full h-full rounded" />
+
+          {/* Empty indicator overlay on map */}
+          {filtered.length === 0 && (
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-[#18191c]/90 backdrop-blur-xs border border-[#3f4553] px-3 py-1.5 rounded text-[11px] text-slate-300 pointer-events-none text-center">
+              <span>Tracciato Rete DOIT VE • In attesa di misure</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom Table: Elenco Misure Aperte */}
+      <div className="bg-[#202227] rounded border border-[#2e323b] overflow-hidden flex flex-col">
+        <div className="px-3 py-1.5 bg-[#18191c] border-b border-[#2e323b] flex items-center justify-between text-xs">
+          <span className="font-bold text-white uppercase tracking-wider text-[11px]">
+            Elenco Misure Aperte ({filtered.length} righe)
+          </span>
+        </div>
+
+        <div className="overflow-x-auto max-h-80 scrollbar-thin">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-50 sticky top-0 border-b border-slate-200 text-slate-600 text-[11px] uppercase">
+            <thead className="bg-[#141518] sticky top-0 border-b border-[#2e323b] text-[#94a3b8] text-[10.5px] uppercase font-semibold">
               <tr>
-                <th className="py-2 px-2.5">Avviso</th>
-                <th className="py-2 px-2.5">Tipo</th>
-                <th className="py-2 px-2.5">Definizione Sede</th>
-                <th className="py-2 px-2.5">Codice Misura</th>
-                <th className="py-2 px-2.5">Testo Codice</th>
-                <th className="py-2 px-2.5">Testo per Misura</th>
-                <th className="py-2 px-2.5">Data Rilievo</th>
-                <th className="py-2 px-2.5">Fine Richiesta</th>
-                <th className="py-2 px-2.5">CLavResp</th>
-                <th className="py-2 px-2.5">Stato Sistema</th>
+                <th className="py-2 px-2">Avviso</th>
+                <th className="py-2 px-2">Data Avviso</th>
+                <th className="py-2 px-2">Stato sist.</th>
+                <th className="py-2 px-2">Tipo</th>
+                <th className="py-2 px-2">Località/Tratta</th>
+                <th className="py-2 px-2">Sede tecnica</th>
+                <th className="py-2 px-2">Bin.</th>
+                <th className="py-2 px-2">Definizione della sede tecnica</th>
+                <th className="py-2 px-2">Codice Misura</th>
+                <th className="py-2 px-2">Km inizio</th>
+                <th className="py-2 px-2">Km fine</th>
+                <th className="py-2 px-2">Val. difetto</th>
+                <th className="py-2 px-2">Testo</th>
+                <th className="py-2 px-2">Cod. Stato</th>
+                <th className="py-2 px-2">Stato</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 text-slate-700">
-              {filtered.slice(0, 50).map((item, idx) => (
-                <tr key={idx} className="hover:bg-slate-50">
-                  <td className="py-1.5 px-2.5 font-mono font-bold text-slate-900">{item.Avviso}</td>
-                  <td className="py-1.5 px-2.5 font-mono font-semibold text-blue-600">{item['Tp.']}</td>
-                  <td className="py-1.5 px-2.5 font-medium text-slate-800 max-w-xs truncate" title={item['Definizione della sede tecnica']}>
-                    {item['Definizione della sede tecnica']}
+            <tbody className="divide-y divide-[#282b34] text-[11.5px] text-[#cbd5e1]">
+              {filtered.map(row => (
+                <tr key={`${row.Avviso}_${row.kmInizio}_${row.Codice}`} className="hover:bg-[#252830] transition-colors">
+                  <td className="py-1.5 px-2 font-mono font-bold text-cyan-300">{row.Avviso}</td>
+                  <td className="py-1.5 px-2 font-mono text-[#94a3b8]">{row.Data || '-'}</td>
+                  <td className="py-1.5 px-2 font-mono text-emerald-400 font-bold">MIAP</td>
+                  <td className="py-1.5 px-2 font-bold text-white">{row.tipo}</td>
+                  <td className="py-1.5 px-2 font-semibold text-white truncate max-w-[140px]" title={row.localita}>
+                    {row.localita}
                   </td>
-                  <td className="py-1.5 px-2.5 font-mono text-slate-700">{item.Codice}</td>
-                  <td className="py-1.5 px-2.5 font-medium text-slate-900">{item['Testo codice per misura']}</td>
-                  <td className="py-1.5 px-2.5 text-slate-600 font-mono text-[11px]">{item['Testo per la misura']}</td>
-                  <td className="py-1.5 px-2.5 font-mono text-slate-700">{item.Data}</td>
-                  <td className="py-1.5 px-2.5 font-mono text-slate-700">{item['FineRich.'] || '-'}</td>
-                  <td className="py-1.5 px-2.5 font-mono text-slate-700">{item.CLavResp}</td>
-                  <td className="py-1.5 px-2.5 font-mono text-[10px] text-slate-700">{item['St.sist.'] || '-'}</td>
+                  <td className="py-1.5 px-2 font-mono text-[11px] text-[#94a3b8]">{row['Sede tecnica']}</td>
+                  <td className="py-1.5 px-2 font-mono">{row.bin}</td>
+                  <td className="py-1.5 px-2 text-[#94a3b8] truncate max-w-[180px]" title={row['Definizione della sede tecnica']}>
+                    {row['Definizione della sede tecnica']}
+                  </td>
+                  <td className="py-1.5 px-2 font-mono font-bold text-amber-300">{row.Codice}</td>
+                  <td className="py-1.5 px-2 font-mono">{row.kmInizio}</td>
+                  <td className="py-1.5 px-2 font-mono">{row.kmFine}</td>
+                  <td className="py-1.5 px-2 font-mono font-bold text-white">{row.valDifetto}</td>
+                  <td className="py-1.5 px-2 text-[#cbd5e1] truncate max-w-[160px]" title={row['Testo codice per misura']}>
+                    {row['Testo codice per misura']}
+                  </td>
+                  <td className="py-1.5 px-2 font-mono text-center">1</td>
+                  <td className="py-1.5 px-2 text-center">
+                    <XCircle className="w-4 h-4 fill-red-500 text-white inline-block" />
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -1,15 +1,23 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { AbbacoItem, Avviso } from '../../types';
-import { RotateCcw, AlertTriangle, Layers, Database, RefreshCw } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, LabelList, ResponsiveContainer } from 'recharts';
 import L from 'leaflet';
 import {
   rfiTracksGeoJson,
   lookupGpsCoordinates,
   DEFAULT_DARK_TILE_URL,
   DEFAULT_DARK_TILE_ATTRIBUTION,
-  MASTER_LINEE_INRETE
 } from '../../data/gpsService';
+import {
+  PbiCanvas,
+  PbiBox,
+  PbiShape,
+  PbiText,
+  PbiTileSlicer,
+  PbiButton,
+  PBI_COLORS,
+  fontSizePx,
+} from '../pbi/primitives';
 
 interface PageAbbacoProps {
   abbaco: AbbacoItem[];
@@ -19,6 +27,39 @@ interface PageAbbacoProps {
   onLoadDemoData?: () => void;
 }
 
+/* -------------------- Palette (dai visual.json PBIR) -------------------- */
+const RED = PBI_COLORS.accent; // #F26D6D
+const YELLOW = PBI_COLORS.warn; // #F5C26B
+
+interface AbbacoColumn {
+  key: string;
+  label: string;
+  width: number;
+  value: (r: AbbacoItem) => string;
+}
+
+/**
+ * Le 12 colonne del `tableEx` nell'ordine dei ROLE Values del PBIR, con le
+ * larghezze esatte (`columnWidth`; Binario/Titolare/Data fine usano
+ * `defaultColumnWidth: 90`).
+ */
+const TABLE_COLUMNS: AbbacoColumn[] = [
+  { key: 'linea', label: 'Linea', width: 128.3242951027215, value: (r) => r.linea },
+  { key: 'tratta', label: 'Tratta', width: 172.4336040456551, value: (r) => r.tratta },
+  { key: 'chiave_rl', label: 'chiave_RL', width: 159.2904169714704, value: (r) => r.chiave_rl },
+  { key: 'rid_vel', label: 'Rid. Vel. (km/h)', width: 67.52743233357717, value: (r) => r.rid_vel },
+  { key: 'binario', label: 'Binario (P/D/L)', width: 90, value: (r) => r.binario },
+  { key: 'inizio', label: 'Inizio', width: 57.22750548646671, value: (r) => r.km_inizio },
+  { key: 'fine', label: 'Fine', width: 62.84564740307242, value: (r) => r.km_fine },
+  { key: 'motivo', label: 'Motivo', width: 167.6248607916895, value: (r) => r.motivo },
+  { key: 'data_inizio', label: 'Data inizio', width: 67.52740379303293, value: (r) => r.data_inizio ?? '' },
+  { key: 'titolare', label: 'Titolare del rallentamento (matr.)', width: 90, value: (r) => r.titolare },
+  { key: 'pianificazione', label: 'Pianificazione', width: 68.46378931967813, value: () => '' },
+  { key: 'data_fine', label: 'Data fine', width: 90, value: (r) => r.data_fine ?? '' },
+];
+
+const TABLE_WIDTH = TABLE_COLUMNS.reduce((sum, c) => sum + c.width, 0);
+
 export const PageAbbaco: React.FC<PageAbbacoProps> = ({
   abbaco,
   avvisi,
@@ -26,20 +67,33 @@ export const PageAbbaco: React.FC<PageAbbacoProps> = ({
   onOpenFileLoader,
   onLoadDemoData,
 }) => {
-  // Multi-Select Slicers State
+  // Slicer a tile: "Divis. ubic." (LO-TR) e "LVU" (LO-TR)
   const [selectedDivisioni, setSelectedDivisioni] = useState<string[]>([]);
   const [selectedUM, setSelectedUM] = useState<string[]>([]);
+  // Slicer a tile ABBACO
   const [selectedLinee, setSelectedLinee] = useState<string[]>([]);
   const [selectedBinari, setSelectedBinari] = useState<string[]>([]);
 
-  // Map Ref
+  // Contenitore Leaflet
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
 
-  const toggleSelection = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, item: string) => {
-    setList(prev => prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item]);
+  const toggle = (setter: React.Dispatch<React.SetStateAction<string[]>>, item: string) => {
+    setter((prev) => (prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]));
   };
+
+  const uniq = (values: string[]): string[] => {
+    const set = new Set<string>();
+    values.forEach((v) => { if (v) set.add(v); });
+    return Array.from(set).sort();
+  };
+
+  // Domini degli slicer: Linea/Binario da ABBA.CO, Divisione/UM dalla LO-TR (avvisi)
+  const lineeList = useMemo(() => uniq(abbaco.map((r) => r.linea)), [abbaco]);
+  const binariList = useMemo(() => uniq(abbaco.map((r) => r.binario)), [abbaco]);
+  const umList = useMemo(() => uniq(abbaco.map((r) => r.titolare)), [abbaco]);
+  const divisioniList = useMemo(() => uniq(avvisi.map((a) => a.divisione)), [avvisi]);
 
   const handleResetFilters = () => {
     setSelectedDivisioni([]);
@@ -48,420 +102,260 @@ export const PageAbbaco: React.FC<PageAbbacoProps> = ({
     setSelectedBinari([]);
   };
 
-  // Line list from master list
-  const lineeDisponibili = MASTER_LINEE_INRETE;
+  // Filtri applicati alla tabella ABBA.CO
+  const filtered = useMemo(() => abbaco.filter((item) => {
+    if (selectedLinee.length > 0 && !selectedLinee.includes(item.linea)) return false;
+    if (selectedBinari.length > 0 && !selectedBinari.includes(item.binario)) return false;
+    if (selectedUM.length > 0 && !selectedUM.includes(item.titolare)) return false;
+    return true;
+  }), [abbaco, selectedLinee, selectedBinari, selectedUM]);
 
-  // Filtered dataset
-  const filtered = useMemo(() => {
-    return abbaco.filter(item => {
-      if (selectedLinee.length > 0 && !selectedLinee.includes(item.linea)) return false;
-      if (selectedBinari.length > 0) {
-        const binMatch = selectedBinari.some(b => item.binario?.toUpperCase().includes(b.split(' ')[0]));
-        if (!binMatch) return false;
-      }
-      return true;
-    });
-  }, [abbaco, selectedLinee, selectedBinari]);
-
-  // Chart data: Numero Rallentamenti per Linea matching Screenshot 8
+  // Bar chart "Numero Rallentamenti": Category = Linea, Y = CountNonNull(chiave_RL)
   const chartData = useMemo(() => {
-    const map: Record<string, number> = {
-      'Bologna-Padova': 0,
-      'Milano-Venezia SL': 0,
-      'Mestre-Treviso': 0,
-    };
-    filtered.forEach(item => {
-      if (map[item.linea] !== undefined) {
-        map[item.linea]++;
-      } else {
-        map[item.linea] = (map[item.linea] || 0) + 1;
-      }
+    const counts: Record<string, number> = {};
+    filtered.forEach((r) => {
+      if (!r.linea) return;
+      counts[r.linea] = (counts[r.linea] ?? 0) + 1;
     });
-
-    return [
-      { name: 'Bologna-Padova', count: map['Bologna-Padova'] || 0 },
-      { name: 'Milano-Venezia SL', count: map['Milano-Venezia SL'] || 0 },
-      { name: 'Mestre-Treviso', count: map['Mestre-Treviso'] || 0 },
-    ];
+    return Object.entries(counts).map(([name, count]) => ({ name, count }));
   }, [filtered]);
 
-  // Initialize Map with ESRI Dark Gray
+  // Inizializzazione mappa (grayscale_dark + referenceLayer DOIT VE)
   useEffect(() => {
-    if (!mapRef.current) return;
-    if (!mapInstanceRef.current) {
-      const map = L.map(mapRef.current, {
-        center: [45.45, 12.05],
-        zoom: 9,
-        zoomControl: true,
-      });
+    if (!mapRef.current || mapInstanceRef.current) return;
 
-      L.tileLayer(DEFAULT_DARK_TILE_URL, {
-        maxZoom: 16,
-        attribution: DEFAULT_DARK_TILE_ATTRIBUTION,
+    const map = L.map(mapRef.current, {
+      center: [45.304095705167896, 11.98123664000002],
+      zoom: 8.71,
+      zoomControl: true,
+      attributionControl: false,
+    });
+
+    L.tileLayer(DEFAULT_DARK_TILE_URL, {
+      attribution: DEFAULT_DARK_TILE_ATTRIBUTION,
+      maxZoom: 16,
+    }).addTo(map);
+
+    try {
+      L.geoJSON(rfiTracksGeoJson as any, {
+        style: () => ({ color: PBI_COLORS.textLight, weight: 2, opacity: 0.85 }),
       }).addTo(map);
-
-      // Add Railway vector line track overlay (163 tratte RFI DOIT VE)
-      try {
-        L.geoJSON(rfiTracksGeoJson as any, {
-          style: (feat) => ({
-            color: feat?.properties?.div === 'VEM1' ? '#38bdf8' : '#818cf8',
-            weight: 2,
-            opacity: 0.65,
-            dashArray: '4, 4',
-          }),
-        }).addTo(map);
-      } catch (e) {
-        console.warn('Could not load railway geojson', e);
-      }
-
-      markersLayerRef.current = L.layerGroup().addTo(map);
-      mapInstanceRef.current = map;
-
-      setTimeout(() => {
-        map.invalidateSize();
-      }, 150);
+    } catch (e) {
+      console.warn('GeoJSON render error:', e);
     }
+
+    const markers = L.layerGroup().addTo(map);
+    markersLayerRef.current = markers;
+    mapInstanceRef.current = map;
+
+    setTimeout(() => map.invalidateSize(), 150);
   }, []);
 
-  // Update map markers when filtered items change
+  // Aggiornamento marker (bubbleLayer: fill #F5C26B, raggio 6-14 in base al conteggio)
   useEffect(() => {
     if (!markersLayerRef.current || !mapInstanceRef.current) return;
     markersLayerRef.current.clearLayers();
 
+    const groups: Record<string, { lat: number; lng: number; count: number; name: string }> = {};
     filtered.forEach((item) => {
       const coords = lookupGpsCoordinates(undefined, item.tratta, item.km_inizio, item.linea);
-      const lat = coords.lat;
-      const lng = coords.lng;
+      const key = `${coords.lat.toFixed(2)}_${coords.lng.toFixed(2)}`;
+      if (!groups[key]) groups[key] = { lat: coords.lat, lng: coords.lng, count: 0, name: item.tratta };
+      groups[key].count++;
+    });
 
-      // Glow halo ring
-      const halo = L.circleMarker([lat, lng], {
-        radius: 12,
-        fillColor: '#f59e0b',
-        color: '#d97706',
+    Object.values(groups).forEach((g) => {
+      const radius = Math.min(14, Math.max(6, 6 + Math.sqrt(g.count)));
+      L.circleMarker([g.lat, g.lng], {
+        radius,
+        fillColor: YELLOW,
+        fillOpacity: 0.7,
+        color: PBI_COLORS.textLight,
         weight: 1,
-        opacity: 0.6,
-        fillOpacity: 0.25,
-      });
-
-      // Center marker
-      const marker = L.circleMarker([lat, lng], {
-        radius: 5.5,
-        fillColor: '#fbbf24',
-        color: '#ffffff',
-        weight: 1.5,
-        opacity: 0.9,
-        fillOpacity: 0.85,
-      });
-
-      const popupContent = `
-        <div style="font-family: system-ui, sans-serif; font-size: 11px; color: #f8fafc; padding: 2px;">
-          <div style="font-weight: 700; color: #fbbf24; border-bottom: 1px solid #334155; padding-bottom: 3px; margin-bottom: 3px;">
-            ⚠️ Rallentamento ABBA.CO: ${item.chiave_rl}
-          </div>
-          <div><strong>Linea:</strong> ${item.linea}</div>
-          <div><strong>Tratta:</strong> ${item.tratta}</div>
-          <div><strong>Prog. Km:</strong> ${item.km_inizio} - ${item.km_fine}</div>
-          <div><strong>Velocità:</strong> <span style="font-weight: 700; color: #ef4444;">${item.rid_vel}</span></div>
-          <div><strong>Motivo:</strong> ${item.motivo}</div>
-          <div><strong>Titolare:</strong> <span style="color: #34d399;">${item.titolare}</span></div>
-        </div>
-      `;
-
-      halo.bindPopup(popupContent);
-      marker.bindPopup(popupContent);
-
-      markersLayerRef.current?.addLayer(halo);
-      markersLayerRef.current?.addLayer(marker);
+      })
+        .bindTooltip(
+          `<div style="font-size:11px"><b>${g.name}</b><br/>Rallentamenti: ${g.count}</div>`,
+          { direction: 'top' },
+        )
+        .addTo(markersLayerRef.current!);
     });
   }, [filtered]);
 
   return (
-    <div className="bg-[#121316] text-[#e2e8f0] min-h-full flex flex-col space-y-2.5 font-sans select-none">
-      {/* Top Banner Row matching Screenshot 8 */}
-      <div className="flex flex-wrap items-center justify-between border-b border-[#2d3139] pb-2">
-        <div className="flex items-center space-x-3">
-          <div className="h-9 px-2.5 bg-white rounded flex items-center justify-center shadow-sm">
-            <span className="text-[#008542] font-black tracking-tighter text-base">RFI</span>
-            <span className="text-[#dc2626] font-bold text-[10px] ml-1 uppercase">FS</span>
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-[#f43f5e] tracking-tight">
-              Abbatimento Codici - DOIT VE
-            </h1>
-            <div className="flex items-center space-x-4 text-xs mt-0.5">
-              <span className="text-white font-bold text-sm">ABBA.CO</span>
-              <span className="text-[#94a3b8]">Dati al: <strong className="text-white font-mono">{dataAggiornamento}</strong></span>
-            </div>
-          </div>
+    <PbiCanvas>
+      {/* ================= Sfondi / pannelli ================= */}
+      <PbiShape x={0} y={216.15384615384616} w={650} h={90} z={0} fill={PBI_COLORS.card} radius={8} />
+      <PbiShape x={158} y={66} w={299} h={85} z={0} fill={PBI_COLORS.card} radius={8} />
+      <PbiShape x={640} y={0} w={640} h={488.18181818181813} z={0} fill="#000000" radius={2} />
+      <PbiShape x={0} y={142} w={650} h={85} z={1000} fill={PBI_COLORS.card} radius={8} />
+      <PbiShape x={447} y={66} w={203} h={86} z={2000} fill={PBI_COLORS.panel} radius={7} />
+      <PbiShape x={0} y={65.6689342403628} w={169.04761904761904} h={85.71428571428571} z={3000} fill={PBI_COLORS.card} radius={8} />
+      <PbiShape x={0} y={295.88880760790056} w={649.8317483540601} h={192.88953913679592} z={6000} fill={PBI_COLORS.panel} radius={5} />
+      <PbiShape x={0} y={479.09090909090907} w={1280} h={240.90909090909088} z={21000} fill={PBI_COLORS.band} radius={5} />
+
+      {/* ================= Etichette dei filtri ================= */}
+      <PbiText x={28.571428571428566} y={86.19047619047618} w={112.38095238095238} h={18} z={9000}
+        text="Divisione" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.canvas} padding={2} />
+      <PbiText x={190.44122965641952} y={83.94444444444446} w={228.71066907775767} h={17.944444444444446} z={2000}
+        text="Unità Manutentiva" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.canvas} padding={2} />
+      <PbiText x={28.75} y={161.875} w={590.625} h={16.875} z={5000}
+        text="Linea" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.canvas} padding={2} />
+      <PbiText x={29.09090909090909} y={233.35664335664336} w={590.4545454545454} h={21.363636363636363} z={2000}
+        text="Scadenza Avviso" sizePt={9} color={PBI_COLORS.textMuted} background={PBI_COLORS.canvas} padding={2} />
+
+      {/* ================= Slicer a tile ================= */}
+      <PbiTileSlicer x={11} y={107} w={147} h={28} z={7000}
+        options={divisioniList} value={selectedDivisioni} onToggle={(v) => toggle(setSelectedDivisioni, v)} />
+      <PbiTileSlicer x={169} y={104} w={277} h={30} z={1000}
+        options={umList} value={selectedUM} onToggle={(v) => toggle(setSelectedUM, v)} />
+      <PbiTileSlicer x={12} y={183} w={621} h={28} z={4000}
+        options={lineeList} value={selectedLinee} onToggle={(v) => toggle(setSelectedLinee, v)} />
+      <PbiTileSlicer x={10} y={259.2307692307692} w={628.4615384615385} h={28.46153846153846} z={1000}
+        options={binariList} value={selectedBinari} onToggle={(v) => toggle(setSelectedBinari, v)} />
+
+      {/* ================= Intestazione ================= */}
+      <PbiBox x={10} y={3.846153846153846} w={210} h={61.53846153846153} z={16000}>
+        <img
+          src="/assets/logo_ufficiale.png"
+          alt="RFI"
+          style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
+        />
+      </PbiBox>
+      <PbiText x={233.07692307692307} y={3.846153846153846} w={343.8461538461538} h={27.69230769230769} z={14000}
+        text="Abbatimento Codici - DOIT VE" sizePt={20} bold color={RED} />
+      <PbiText x={233} y={35} w={84} h={25} z={18000}
+        text="ABBA.CO" sizePt={15} bold color={PBI_COLORS.textLight} background={PBI_COLORS.canvas} />
+      <PbiText x={335.7240205753123} y={33.188689916520104} w={70} h={27} z={17000}
+        text="Dati al:" sizePt={12} color={PBI_COLORS.textMuted} align="right" vAlign="middle" background={PBI_COLORS.canvas} padding={2} />
+      <PbiText x={397.6470974983892} y={34.26561299344317} w={130.76923076923077} h={26.923076923076923} z={15000}
+        text={dataAggiornamento} sizePt={12} color={PBI_COLORS.textLight} align="center" vAlign="middle" background={PBI_COLORS.canvas} padding={2} />
+
+      {/* ================= Reset Filtri ================= */}
+      <PbiButton x={554} y={31} w={96.36363636363636} h={44.54545454545454} z={23000}
+        label="Reset Filtri" onClick={handleResetFilters} />
+
+      {/* ================= KPI Num. Rallentamenti ================= */}
+      <PbiText x={456.9422092172641} y={72.09948792977323} w={161.98975859546454} h={28.09070958302853} z={20000}
+        text="Num. Rallentamenti" sizePt={12} color={PBI_COLORS.textLight} />
+      <PbiBox x={457} y={82} w={181} h={59} z={19000} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontSize: fontSizePx(35), color: YELLOW, lineHeight: 1 }}>{filtered.length}</span>
+      </PbiBox>
+
+      {/* ================= Bar chart Numero Rallentamenti ================= */}
+      <PbiText x={29.027066569129484} y={316.48866130212144} w={537.4689100219459} h={19.663496708119972} z={10000}
+        text="Numero Rallentamenti" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.canvas} padding={2} />
+      <PbiBox x={29.027066569129484} y={323.0431602048281} w={603.9502560351134} h={159.18068763716167} z={11000} style={{ overflow: 'hidden' }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart layout="vertical" data={chartData} margin={{ top: 5, right: 26, left: 0, bottom: 0 }}>
+            <XAxis type="number" hide />
+            <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={110}
+              tick={{ fill: PBI_COLORS.textLight, fontSize: 11 }} />
+            <Bar dataKey="count" fill={YELLOW} isAnimationActive={false} barSize={14}>
+              <LabelList dataKey="count" position="right" fill={PBI_COLORS.textLight} fontSize={12} />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </PbiBox>
+
+      {/* ================= Mappa ================= */}
+      <PbiBox x={656.3636363636363} y={17.27272727272727} w={605.4545454545454} h={454.5454545454545} z={8000} style={{ overflow: 'hidden' }}>
+        <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+      </PbiBox>
+
+      {/* ================= Tabella (12 colonne) ================= */}
+      <PbiBox x={14.545454545454545} y={491.81818181818176} w={1250.9090909090908} h={214.54545454545453} z={22000}
+        style={{ border: `2px solid ${RED}`, overflow: 'hidden', background: PBI_COLORS.tableRowSecondary }}>
+        <div className="scrollbar-thin" style={{ width: '100%', height: '100%', overflow: 'auto' }}>
+          <table style={{ borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', width: TABLE_WIDTH, fontSize: fontSizePx(8) }}>
+            <colgroup>
+              {TABLE_COLUMNS.map((c) => <col key={c.key} style={{ width: c.width }} />)}
+            </colgroup>
+            <thead>
+              <tr>
+                {TABLE_COLUMNS.map((c) => (
+                  <th
+                    key={c.key}
+                    style={{
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 1,
+                      background: PBI_COLORS.tableHeader,
+                      color: PBI_COLORS.textPrimary,
+                      fontWeight: 400,
+                      textAlign: 'left',
+                      padding: '3px 4px',
+                      borderRight: `1px solid ${YELLOW}`,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {c.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((row, i) => (
+                <tr
+                  key={`${row.chiave_rl}-${i}`}
+                  style={{ background: i % 2 === 0 ? PBI_COLORS.tableRowPrimary : PBI_COLORS.tableRowSecondary }}
+                >
+                  {TABLE_COLUMNS.map((c) => {
+                    const value = c.value(row);
+                    return (
+                      <td
+                        key={c.key}
+                        title={value}
+                        style={{
+                          padding: '2px 4px',
+                          color: PBI_COLORS.textPrimary,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {value}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+      </PbiBox>
 
-        <button
-          onClick={handleResetFilters}
-          className="flex items-center space-x-1 px-3 py-1 bg-[#1e222a] hover:bg-[#282d38] border border-[#3f4553] rounded text-xs font-semibold text-slate-200 transition-colors cursor-pointer shadow-sm"
-        >
-          <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-          <span>Reset Filtri</span>
-        </button>
-      </div>
-
-      {/* Empty State Banner if 0 records */}
+      {/* ================= Stato vuoto ================= */}
       {abbaco.length === 0 && (
-        <div className="bg-[#1c1f26] border-l-4 border-amber-400 p-2.5 rounded border border-[#2e323b] flex flex-wrap items-center justify-between gap-2 shadow-md">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-1.5 bg-amber-500/15 text-amber-400 rounded">
-              <Database className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="font-bold text-white text-xs block">Web App non alimentata (0 rallentamenti)</span>
-              <span className="text-[11px] text-slate-400">
-                Alimenta la web app con il file <strong className="text-amber-400 font-mono">ABBA.CO</strong> oppure carica i dati demo.
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
+        <PbiBox x={0} y={0} w={1280} h={720} z={65000}
+          style={{ background: 'rgba(0,0,0,0.72)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+          <span style={{ color: PBI_COLORS.textPrimary, fontSize: 15, fontWeight: 700 }}>Web app non alimentata (0 rallentamenti)</span>
+          <span style={{ color: PBI_COLORS.textMuted, fontSize: 12 }}>
+            Alimenta la web app con il file ABBA.CO oppure carica i dati demo.
+          </span>
+          <div style={{ display: 'flex', gap: 10 }}>
             {onOpenFileLoader && (
               <button
+                type="button"
                 onClick={onOpenFileLoader}
-                className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded cursor-pointer shadow"
+                style={{ background: RED, color: '#111', border: 'none', borderRadius: 4, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
               >
                 Alimenta Web App
               </button>
             )}
             {onLoadDemoData && (
               <button
+                type="button"
                 onClick={onLoadDemoData}
-                className="px-3 py-1 bg-[#25282e] hover:bg-[#2f333a] border border-[#3f4553] text-amber-300 font-semibold text-xs rounded cursor-pointer flex items-center space-x-1"
+                style={{ background: PBI_COLORS.button, color: PBI_COLORS.textLight, border: `1px solid ${PBI_COLORS.tileBorder}`, borderRadius: 4, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
               >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Carica Demo</span>
+                Carica Demo
               </button>
             )}
           </div>
-        </div>
+        </PbiBox>
       )}
-
-      {/* Upper Two-Column Layout exactly matching Screenshot 8 */}
-      <div className="grid grid-cols-12 gap-3 items-stretch">
-        {/* Left Side: Slicers & Charts (55% width) */}
-        <div className="col-span-12 lg:col-span-6 flex flex-col space-y-2.5">
-          {/* Row 1: Divisione, Unità Manutentiva, Num. Rallentamenti */}
-          <div className="grid grid-cols-12 gap-2">
-            <div className="col-span-4 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] flex flex-col justify-between shadow-sm">
-              <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1">Divisione</span>
-              <div className="grid grid-cols-2 gap-1.5">
-                {['VEM1', 'VEM2'].map(div => {
-                  const isSelected = selectedDivisioni.includes(div);
-                  return (
-                    <button
-                      key={div}
-                      onClick={() => toggleSelection(selectedDivisioni, setSelectedDivisioni, div)}
-                      className={`py-1 text-center font-bold rounded-xs border text-xs cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-amber-500/25 border-amber-500 text-amber-300 shadow'
-                          : 'bg-[#141518] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
-                      }`}
-                    >
-                      {div}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="col-span-5 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] flex flex-col justify-between shadow-sm">
-              <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1">Unità Manutentiva</span>
-              <div className="grid grid-cols-4 gap-1">
-                {['LVU1', 'LVU2', 'LVU3', 'LVU4'].map(lvu => {
-                  const isSelected = selectedUM.includes(lvu);
-                  return (
-                    <button
-                      key={lvu}
-                      onClick={() => toggleSelection(selectedUM, setSelectedUM, lvu)}
-                      className={`py-1 text-center font-bold rounded-xs border text-xs cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-amber-500/25 border-amber-500 text-amber-300 shadow'
-                          : 'bg-[#141518] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
-                      }`}
-                    >
-                      {lvu}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Num. Rallentamenti KPI Card (Large amber number) */}
-            <div className="col-span-3 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] flex flex-col items-center justify-center shadow-sm">
-              <span className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-wider">Num. Rallentamenti</span>
-              <span className="text-3xl font-black text-[#fbbf24] font-mono leading-none mt-1">
-                {filtered.length}
-              </span>
-            </div>
-          </div>
-
-          {/* Row 2: Linea Slicer (Multi-Select buttons) */}
-          <div className="bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] shadow-sm">
-            <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1 block">Linea</span>
-            <div className="grid grid-cols-3 gap-1.5">
-              {lineeDisponibili.map(linea => {
-                const isSelected = selectedLinee.includes(linea);
-                return (
-                  <button
-                    key={linea}
-                    onClick={() => toggleSelection(selectedLinee, setSelectedLinee, linea)}
-                    className={`py-1 text-center font-bold rounded-xs border text-xs cursor-pointer transition-all ${
-                      isSelected
-                        ? 'bg-amber-500/25 border-amber-500 text-amber-300 shadow'
-                        : 'bg-[#141518] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
-                    }`}
-                  >
-                    {linea}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Row 3: Scadenza Avviso / Binario Slicer matching Screenshot 8 */}
-          <div className="bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] shadow-sm text-xs">
-            <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1 block">Scadenza Avviso / Tipo Binario</span>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
-              {['D', 'D (marciaDX)', 'D (marciaSX)', 'P', 'P (marciaDX)', 'P (marciaSX)'].map(bin => {
-                const isSelected = selectedBinari.includes(bin);
-                return (
-                  <button
-                    key={bin}
-                    onClick={() => toggleSelection(selectedBinari, setSelectedBinari, bin)}
-                    className={`py-1 text-center font-bold rounded-xs border text-[10.5px] cursor-pointer transition-all ${
-                      isSelected
-                        ? 'bg-amber-500/25 border-amber-500 text-amber-300 shadow'
-                        : 'bg-[#141518] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
-                    }`}
-                  >
-                    {bin}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Row 4: Numero Rallentamenti Bar Chart matching Screenshot 8 */}
-          <div className="bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] flex flex-col h-48 shadow-sm">
-            <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1">Numero Rallentamenti</span>
-            <div className="flex-1 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  layout="vertical"
-                  data={chartData}
-                  margin={{ top: 5, right: 35, left: 10, bottom: 5 }}
-                >
-                  <XAxis type="number" stroke="#64748b" fontSize={9} hide />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    stroke="#94a3b8"
-                    fontSize={10}
-                    tickLine={false}
-                    width={110}
-                  />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#181a20', borderColor: '#3f4553', fontSize: '11px', color: '#fff' }}
-                  />
-                  <Bar
-                    dataKey="count"
-                    fill="#fbbf24"
-                    cursor="pointer"
-                    label={{ position: 'right', fill: '#cbd5e1', fontSize: 10, fontWeight: 700 }}
-                    onClick={(entry) => toggleSelection(selectedLinee, setSelectedLinee, entry.name)}
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={selectedLinee.includes(entry.name) ? '#f59e0b' : '#d97706'}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Side: Map Canvas taking entire Upper Right Quadrant (Matching Screenshot 8) */}
-        <div className="col-span-12 lg:col-span-6 flex flex-col bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] shadow-sm relative min-h-[380px] lg:min-h-full">
-          <div className="flex items-center justify-between pb-1.5 px-1 border-b border-[#2e333d] mb-1.5">
-            <div className="flex items-center space-x-1.5">
-              <Layers className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-xs font-bold text-white">Mappa Rallentamenti ABBA.CO</span>
-            </div>
-            <span className="text-[10px] text-slate-400 font-mono bg-[#141518] px-2 py-0.5 rounded border border-[#374151]">
-              ESRI Dark • Open GIS
-            </span>
-          </div>
-
-          <div className="flex-1 w-full min-h-[340px] rounded overflow-hidden relative border border-[#2d323d]">
-            <div ref={mapRef} className="w-full h-full" />
-
-            {filtered.length === 0 && (
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-400 bg-black/85 backdrop-blur-xs border border-[#3f4553] px-3.5 py-2 rounded text-[11px] text-slate-300 pointer-events-none text-center">
-                <span>Tracciato Rete DOIT VE • In attesa di rallentamenti</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Area: Table spanning full width matching Screenshot 8 */}
-      <div className="bg-[#1c1f26] rounded-md border border-[#2e333d] overflow-hidden flex flex-col flex-1 shadow-sm min-h-[220px]">
-        <div className="px-3 py-1.5 bg-[#16181d] border-b border-[#2e333d] flex items-center justify-between text-xs shrink-0">
-          <span className="font-bold text-white">
-            Elenco Rallentamenti ABBA.CO ({filtered.length} righe)
-          </span>
-          <span className="text-[11px] text-[#94a3b8]">
-            {selectedLinee.length > 0 ? `Linee: ${selectedLinee.join(', ')} • ` : ''}
-            Tratte con riduzione di velocità attiva o pianificata
-          </span>
-        </div>
-
-        <div className="overflow-auto flex-1 min-h-[200px] max-h-[calc(100vh-480px)] scrollbar-thin">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#141518] sticky top-0 border-b border-[#2e333d] text-[#94a3b8] text-[10.5px] uppercase font-semibold">
-              <tr>
-                <th className="py-2 px-2.5">Linea</th>
-                <th className="py-2 px-2.5">Tratta</th>
-                <th className="py-2 px-2.5">Chiave RL</th>
-                <th className="py-2 px-2.5">Rid. Vel. (km/h)</th>
-                <th className="py-2 px-2.5">Binario (P/D/L)</th>
-                <th className="py-2 px-2.5">Inizio</th>
-                <th className="py-2 px-2.5">Fine</th>
-                <th className="py-2 px-2.5">Motivo</th>
-                <th className="py-2 px-2.5">Data inizio</th>
-                <th className="py-2 px-2.5">Titolare del rallentamento</th>
-                <th className="py-2 px-2.5">Data pianificata</th>
-                <th className="py-2 px-2.5">Data fine</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#252932] text-[11px] font-mono text-[#cbd5e1]">
-              {filtered.map((row, idx) => (
-                <tr key={`${row.chiave_rl}-${idx}`} className="hover:bg-[#20242e] transition-colors">
-                  <td className="py-1.5 px-2.5 font-sans font-bold text-white">{row.linea}</td>
-                  <td className="py-1.5 px-2.5 font-sans text-slate-200">{row.tratta}</td>
-                  <td className="py-1.5 px-2.5 font-bold text-amber-400">{row.chiave_rl}</td>
-                  <td className="py-1.5 px-2.5 text-red-400 font-bold">{row.rid_vel}</td>
-                  <td className="py-1.5 px-2.5 text-slate-300">{row.binario}</td>
-                  <td className="py-1.5 px-2.5 text-slate-300">{row.km_inizio}</td>
-                  <td className="py-1.5 px-2.5 text-slate-300">{row.km_fine}</td>
-                  <td className="py-1.5 px-2.5 font-sans text-slate-300 truncate max-w-[180px]">{row.motivo}</td>
-                  <td className="py-1.5 px-2.5 text-slate-400">{row.data_inizio || '17/07/2026'}</td>
-                  <td className="py-1.5 px-2.5 text-emerald-400 font-sans">{row.titolare}</td>
-                  <td className="py-1.5 px-2.5 text-slate-400">{row.data_fine || '31/08/2026'}</td>
-                  <td className="py-1.5 px-2.5 text-slate-400">-</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+    </PbiCanvas>
   );
 };

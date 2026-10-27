@@ -1,14 +1,27 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Iw67Item, Avviso } from '../../types';
-import { RotateCcw, ChevronRight, Database, RefreshCw, Layers } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, LabelList, ResponsiveContainer } from 'recharts';
 import L from 'leaflet';
 import {
   rfiTracksGeoJson,
+  lookupGpsCoordinates,
+  extractBaseSede,
+  parseItalianNumber,
   DEFAULT_DARK_TILE_URL,
   DEFAULT_DARK_TILE_ATTRIBUTION,
-  MASTER_LINEE_INRETE
+  MASTER_LINEE_INRETE,
 } from '../../data/gpsService';
+import {
+  PbiCanvas,
+  PbiBox,
+  PbiShape,
+  PbiText,
+  PbiTileSlicer,
+  PbiListSlicer,
+  PbiButton,
+  PBI_COLORS,
+  fontSizePx,
+} from '../pbi/primitives';
 
 export interface FrequenzaRow {
   id: string;
@@ -34,6 +47,112 @@ interface PageFrequenzaV3V4Props {
   onLoadDemoData?: () => void;
 }
 
+/** Riga arricchita con le dimensioni dei filtri del PBIR (non esportata). */
+interface FrequenzaRowExt extends FrequenzaRow {
+  anno: string;
+  trimestre: string;
+  divisione: string;
+  tipo: string;
+  stato: string;
+  scadenza: string;
+}
+
+/* -------------------- Domini dei filtri (dai visual PBIR) -------------------- */
+const TRIMESTRI = ['1', '2', '3', '4'];
+const DIVISIONI = ['VEM1', 'VEM2'];
+const UNITA_MANUTENTIVE = ['LVU1', 'LVU2', 'LVU3', 'LVU4'];
+const TIPI = ['V3', 'V4'];
+const SCADENZE = ['CHIUSO', 'SCAD.<10GG', 'SCAD.<30GG', 'SCAD.<60GG', 'SCAD.>60GG', 'SCADUTO'];
+const STATI_MISURA = ['MIAP', 'MISC'];
+const BIN_ORDER = ['DISPARI', 'PARI', 'UNICO'];
+
+const ACCENT = PBI_COLORS.accent; // #F26D6D
+const BIN_GREEN = '#99BD3C';
+
+/* -------------------- Helper di mapping -------------------- */
+
+/** "15.08.2019" / "15/08/2019" -> { anno, trimestre }. */
+const parseDataAvviso = (value?: string): { anno: string; trimestre: string } => {
+  const m = /(\d{1,2})[./](\d{1,2})[./](\d{4})/.exec(value || '');
+  if (!m) return { anno: '', trimestre: '' };
+  const month = Number(m[2]);
+  return { anno: m[3], trimestre: String(Math.ceil(month / 3)) };
+};
+
+/** IH06.Bin. ricavato dalla definizione della sede tecnica ("Binario Pari ..."). */
+const parseBin = (definizione: string): string => {
+  const m = /Binario\s+([A-Za-zÀ-ÿ]+)/i.exec(definizione);
+  const raw = (m?.[1] || '').toUpperCase();
+  if (raw === 'PARI') return 'PARI';
+  if (raw === 'DISPARI') return 'DISPARI';
+  return 'UNICO';
+};
+
+/** IW67.Km. rif. ricavato dalla prima coppia chilometrica di "Testo per la misura". */
+const parseKmRif = (testo?: string): number => {
+  const m = /^(\d{1,4}[.,]\d+)/.exec((testo || '').trim());
+  return m ? Math.round(parseItalianNumber(m[1])) : 0;
+};
+
+/** LO-TR.Località/Tratta: dal nome sede dell'avviso o dal testo della definizione. */
+const parseLocalita = (definizione: string, fallback: string): string => {
+  const cleaned = definizione.replace(/^Binario\s+\S+\s+/i, '').trim();
+  return cleaned || fallback;
+};
+
+/** Scadenza avviso (LO-TR) derivata dallo stato dell'avviso collegato. */
+const scadenzaDaAvviso = (a?: Avviso): string => {
+  if (!a) return 'SCAD.>60GG';
+  if ((a.stato_utente || '').toUpperCase().includes('CHIUSO')) return 'CHIUSO';
+  if (a.stato_scadenza === 'Scaduto') return 'SCADUTO';
+  if (a.stato_scadenza === 'In scadenza') return 'SCAD.<30GG';
+  return 'SCAD.>60GG';
+};
+
+/** Formattazione compatta dello stile card Power BI ("12K"). */
+const formatCount = (n: number): string =>
+  n >= 1000 ? `${(n / 1000).toFixed(1).replace('.', ',')}K` : String(n);
+
+/* -------------------- Grafico a barre "Numero Difetti Binario" -------------------- */
+
+interface BinDatum {
+  name: string;
+  count: number;
+}
+
+const BinBars: React.FC<{
+  x: number; y: number; w: number; h: number; z: number;
+  data: BinDatum[];
+  onSelect: (bin: string) => void;
+}> = ({ x, y, w, h, z, data, onSelect }) => (
+  <PbiBox x={x} y={y} w={w} h={h} z={z} style={{ overflow: 'hidden' }}>
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart layout="vertical" data={data} margin={{ top: 4, right: 30, left: 0, bottom: 4 }}>
+        <XAxis type="number" hide />
+        <YAxis
+          type="category"
+          dataKey="name"
+          tickLine={false}
+          axisLine={false}
+          width={70}
+          tick={{ fill: '#E6E6E6', fontSize: 12 }}
+        />
+        <Bar
+          dataKey="count"
+          fill={BIN_GREEN}
+          isAnimationActive={false}
+          barSize={18}
+          cursor="pointer"
+          onClick={(d: BinDatum) => onSelect(d.name)}
+        >
+          <LabelList dataKey="count" position="right" fill="#E6E6E6" fontSize={16} />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  </PbiBox>
+);
+
+/* -------------------- Pagina -------------------- */
 export const PageFrequenzaV3V4: React.FC<PageFrequenzaV3V4Props> = ({
   iw67,
   avvisi,
@@ -42,523 +161,438 @@ export const PageFrequenzaV3V4: React.FC<PageFrequenzaV3V4Props> = ({
   onOpenFileLoader,
   onLoadDemoData,
 }) => {
-  // Multi-Select Slicers State
-  const [selectedAnni, setSelectedAnni] = useState<string[]>([]);
-  const [selectedTrimestri, setSelectedTrimestri] = useState<string[]>([]);
-  const [selectedDivisioni, setSelectedDivisioni] = useState<string[]>([]);
-  const [selectedUM, setSelectedUM] = useState<string[]>([]);
-  const [selectedTipi, setSelectedTipi] = useState<string[]>([]);
-  const [selectedScadenze, setSelectedScadenze] = useState<string[]>([]);
-  const [selectedStatiMisura, setSelectedStatiMisura] = useState<string[]>([]);
-  const [selectedLinee, setSelectedLinee] = useState<string[]>([]);
+  // Filtri (multi-selezione), come gli slicer del PBIR
+  const [selAnni, setSelAnni] = useState<string[]>([]);
+  const [selTrimestri, setSelTrimestri] = useState<string[]>([]);
+  const [selDivisioni, setSelDivisioni] = useState<string[]>([]);
+  const [selUm, setSelUm] = useState<string[]>([]);
+  const [selTipi, setSelTipi] = useState<string[]>([]);
+  const [selScadenze, setSelScadenze] = useState<string[]>([]);
+  const [selStati, setSelStati] = useState<string[]>([]);
+  const [selLinee, setSelLinee] = useState<string[]>([]);
 
-  // Selected Row for Drill
-  const [selectedRowId, setSelectedRowId] = useState<string>('freq_1');
+  const [selectedRowId, setSelectedRowId] = useState<string>('');
 
-  // Map Ref
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
 
-  const lineeList = MASTER_LINEE_INRETE;
-
-  const toggleSelection = (list: string[], setList: React.Dispatch<React.SetStateAction<string[]>>, item: string) => {
-    setList(prev => prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item]);
+  const toggle = (setter: React.Dispatch<React.SetStateAction<string[]>>, item: string) => {
+    setter((prev) => (prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]));
   };
 
   const handleResetFilters = () => {
-    setSelectedAnni([]);
-    setSelectedTrimestri([]);
-    setSelectedDivisioni([]);
-    setSelectedUM([]);
-    setSelectedTipi([]);
-    setSelectedScadenze([]);
-    setSelectedStatiMisura([]);
-    setSelectedLinee([]);
+    setSelAnni([]);
+    setSelTrimestri([]);
+    setSelDivisioni([]);
+    setSelUm([]);
+    setSelTipi([]);
+    setSelScadenze([]);
+    setSelStati([]);
+    setSelLinee([]);
   };
 
-  // Base Aggregated Frequency Dataset exactly matching Screenshot 5
-  const baseRows: FrequenzaRow[] = useMemo(() => {
-    return [
-      { id: 'freq_1', linea: 'Milano-Venezia', setePrimoLivello: 'LO3002', localita: 'VENEZIA MESTRE', sete: 'LO3002-BC-BC23', definizione: 'Binario Dispari VE.MESTRE (Milano AV/AC)', bin: 'DISPARI', kmRif: 258, conteggio: 266, um: 'LVU1', lat: 45.482, lng: 12.232 },
-      { id: 'freq_2', linea: 'Nodo di Padova', setePrimoLivello: 'LO2000', localita: 'PADOVA', sete: 'LO2000-BC-BC25', definizione: 'Binario V (227+106-233+053 AC/AV) PD', bin: 'DISPARI', kmRif: 229, conteggio: 252, um: 'LVU1', lat: 45.418, lng: 11.881 },
-      { id: 'freq_3', linea: 'Milano-Venezia', setePrimoLivello: 'LO3002', localita: 'VENEZIA MESTRE', sete: 'LO3002-BC-BC23', definizione: 'Binario Dispari VE.MESTRE (Milano AV/AC)', bin: 'DISPARI', kmRif: 256, conteggio: 223, um: 'LVU1', lat: 45.483, lng: 12.228 },
-      { id: 'freq_4', linea: 'Milano-Venezia (AC/AV)', setePrimoLivello: 'TR0148', localita: 'PADOVA FASCIO SE-GR. SC. VE MESTRE ST', sete: 'TR0148-BC-BC01', definizione: 'Binario Dispari PD F. Sec-ME Sc. AC/AV', bin: 'DISPARI', kmRif: 243, conteggio: 206, um: 'LVU1', lat: 45.451, lng: 12.055 },
-      { id: 'freq_5', linea: 'Milano-Venezia', setePrimoLivello: 'LO3002', localita: 'VENEZIA MESTRE', sete: 'LO3002-BC-BC24', definizione: 'Binario Pari VE.MESTRE (Milano AV/AC)', bin: 'PARI', kmRif: 255, conteggio: 180, um: 'LVU1', lat: 45.481, lng: 12.225 },
-      { id: 'freq_6', linea: 'Nodo di Padova', setePrimoLivello: 'LO2000', localita: 'PADOVA', sete: 'LO2000-BC-BC23', definizione: 'Binario III (227+106-233+053 AC/AV) PD', bin: 'PARI', kmRif: 229, conteggio: 174, um: 'LVU1', lat: 45.417, lng: 11.882 },
-      { id: 'freq_7', linea: 'Milano-Venezia', setePrimoLivello: 'LO3002', localita: 'VENEZIA MESTRE', sete: 'LO3002-BC-BC25', definizione: 'Binario Dispari VE.MESTRE (MI St.-PV)', bin: 'DISPARI', kmRif: 258, conteggio: 168, um: 'LVU1', lat: 45.484, lng: 12.234 },
-      { id: 'freq_8', linea: 'Milano-Venezia (AC/AV)', setePrimoLivello: 'TR0148', localita: 'PADOVA FASCIO SE-GR. SC. VE MESTRE ST', sete: 'TR0148-BC-BC02', definizione: 'Binario Pari PD F. Sec-ME Sc. AC/AV', bin: 'PARI', kmRif: 251, conteggio: 166, um: 'LVU1', lat: 45.462, lng: 12.118 },
-      { id: 'freq_9', linea: 'Milano-Venezia (AC/AV)', setePrimoLivello: 'TR0148', localita: 'PADOVA FASCIO SE-GR. SC. VE MESTRE ST', sete: 'TR0148-BC-BC01', definizione: 'Binario Dispari PD F. Sec-ME Sc. AC/AV', bin: 'DISPARI', kmRif: 236, conteggio: 144, um: 'LVU1', lat: 45.430, lng: 11.952 },
-      { id: 'freq_10', linea: 'Nodo di Padova', setePrimoLivello: 'LO2000', localita: 'PADOVA', sete: 'LO2000-BC-BC24', definizione: 'Binario IV (227+106-233+053 AC/AV) PD', bin: 'PARI', kmRif: 228, conteggio: 144, um: 'LVU1', lat: 45.416, lng: 11.879 },
-      { id: 'freq_11', linea: 'Milano-Venezia', setePrimoLivello: 'LO1251', localita: 'DOLO', sete: 'LO1251-BC-BC02', definizione: 'Binario Pari DOLO', bin: 'PARI', kmRif: 244, conteggio: 131, um: 'LVU1', lat: 45.453, lng: 12.072 },
-      { id: 'freq_12', linea: 'Milano-Venezia', setePrimoLivello: 'LO3002', localita: 'VENEZIA MESTRE', sete: 'LO3002-BC-BC24', definizione: 'Binario Pari VE.MESTRE (Milano AV/AC)', bin: 'PARI', kmRif: 257, conteggio: 110, um: 'LVU1', lat: 45.480, lng: 12.230 },
-      { id: 'freq_13', linea: 'Bologna-Padova', setePrimoLivello: 'LO1776', localita: 'MONSELICE', sete: 'LO0391-BC-BC01', definizione: 'Binario II', bin: 'UNICO', kmRif: 37, conteggio: 85, um: 'LVU2', lat: 45.246, lng: 11.748 },
-    ];
-  }, []);
+  // Aggregazione di frequenza: conteggi per Sede tecnica / Linea / Binario / Km
+  const baseRows = useMemo<FrequenzaRowExt[]>(() => {
+    const groups = new Map<string, {
+      row: FrequenzaRowExt;
+      count: number;
+      kms: number[];
+    }>();
 
-  // Filtered dataset
-  const filtered = useMemo(() => {
-    return baseRows.filter(item => {
-      if (selectedLinee.length > 0 && !selectedLinee.includes(item.linea)) return false;
-      if (selectedUM.length > 0 && !selectedUM.includes(item.um)) return false;
-      return true;
-    });
-  }, [baseRows, selectedLinee, selectedUM]);
+    iw67.forEach((item) => {
+      const avv = avvisi.find((a) => a.avviso === item.Avviso);
+      const definizione = item['Definizione della sede tecnica'] || '';
+      const sede = item['Sede tecnica'] || '';
+      const setePrimoLivello = extractBaseSede(sede) || sede.split('-')[0] || '';
+      const linea = avv?.linea || 'Milano-Venezia';
+      const localita = avv?.nome_sede || parseLocalita(definizione, sede);
+      const bin = parseBin(definizione);
+      const kmRif = parseKmRif(item['Testo per la misura']);
+      const um = item.CLavResp || 'LVU1';
+      const { anno, trimestre } = parseDataAvviso(item.Data);
+      const tipo = item['Tp.'] || 'V3';
+      const stato = item['St.sist.'] || 'MISC';
+      const divisione = avv?.divisione || 'VEM1';
+      const scadenza = scadenzaDaAvviso(avv);
+      const coords = lookupGpsCoordinates(sede, localita, kmRif || item.Latit_iniz, linea);
 
-  // Selected Row Object
-  const selectedRow = useMemo(() => {
-    return baseRows.find(r => r.id === selectedRowId) || filtered[0] || baseRows[0];
-  }, [baseRows, selectedRowId, filtered]);
-
-  // Total count formatted like Power BI "12K"
-  const totalCount = useMemo(() => {
-    return filtered.reduce((acc, r) => acc + r.conteggio, 0);
-  }, [filtered]);
-
-  // Chart Data: Numero Difetti Binario (DISPARI, PARI, UNICO) matching Screenshot 5
-  const binarioChartData = useMemo(() => {
-    let dispari = 0;
-    let pari = 0;
-    let unico = 0;
-    filtered.forEach(r => {
-      if (r.bin === 'DISPARI') dispari += r.conteggio;
-      else if (r.bin === 'PARI') pari += r.conteggio;
-      else unico += r.conteggio;
-    });
-
-    return [
-      { name: 'DISPARI', count: dispari, label: `${(dispari / 1000).toFixed(1).replace('.', ',')}K` },
-      { name: 'PARI', count: pari, label: `${(pari / 1000).toFixed(1).replace('.', ',')}K` },
-      { name: 'UNICO', count: unico, label: `${(unico / 1000).toFixed(1).replace('.', ',')}K` },
-    ];
-  }, [filtered]);
-
-  // Initialize Map
-  useEffect(() => {
-    if (!mapRef.current) return;
-    if (!mapInstanceRef.current) {
-      const map = L.map(mapRef.current, {
-        center: [45.50, 12.05],
-        zoom: 8.5,
-        zoomControl: true,
-      });
-
-      L.tileLayer(DEFAULT_DARK_TILE_URL, {
-        attribution: DEFAULT_DARK_TILE_ATTRIBUTION,
-        maxZoom: 16,
-      }).addTo(map);
-
-      try {
-        L.geoJSON(rfiTracksGeoJson as any, {
-          style: (feat) => ({
-            color: feat?.properties?.div === 'VEM1' ? '#38bdf8' : '#818cf8',
-            weight: 1.8,
-            opacity: 0.6,
-            dashArray: '4, 4'
-          })
-        }).addTo(map);
-      } catch (e) {
-        console.warn('GeoJSON render error:', e);
+      const key = [linea, setePrimoLivello, localita, sede, definizione, bin, um].join('|');
+      const existing = groups.get(key);
+      if (existing) {
+        existing.count += 1;
+        if (kmRif > 0) existing.kms.push(kmRif);
+      } else {
+        groups.set(key, {
+          count: 1,
+          kms: kmRif > 0 ? [kmRif] : [],
+          row: {
+            id: '',
+            linea,
+            setePrimoLivello,
+            localita,
+            sete: sede,
+            definizione,
+            bin,
+            kmRif,
+            conteggio: 0,
+            um,
+            lat: coords.lat,
+            lng: coords.lng,
+            anno,
+            trimestre,
+            divisione,
+            tipo,
+            stato,
+            scadenza,
+          },
+        });
       }
+    });
 
-      const markers = L.layerGroup().addTo(map);
-      markersLayerRef.current = markers;
-      mapInstanceRef.current = map;
+    return Array.from(groups.values()).map((g, i) => ({
+      ...g.row,
+      id: `freq_${i}`,
+      kmRif: g.kms.length ? Math.min(...g.kms) : 0,
+      conteggio: g.count,
+    }));
+  }, [iw67, avvisi]);
 
-      setTimeout(() => {
-        map.invalidateSize();
-      }, 150);
+  const anniOptions = useMemo(
+    () => Array.from(new Set(baseRows.map((r) => r.anno))).filter(Boolean).sort(),
+    [baseRows],
+  );
+
+  const filtered = useMemo(() => baseRows.filter((r) => {
+    if (selAnni.length > 0 && !selAnni.includes(r.anno)) return false;
+    if (selTrimestri.length > 0 && !selTrimestri.includes(r.trimestre)) return false;
+    if (selDivisioni.length > 0 && !selDivisioni.includes(r.divisione)) return false;
+    if (selUm.length > 0 && !selUm.includes(r.um)) return false;
+    if (selTipi.length > 0 && !selTipi.includes(r.tipo)) return false;
+    if (selScadenze.length > 0 && !selScadenze.includes(r.scadenza)) return false;
+    if (selStati.length > 0 && !selStati.includes(r.stato)) return false;
+    if (selLinee.length > 0 && !selLinee.includes(r.linea)) return false;
+    return true;
+  }), [baseRows, selAnni, selTrimestri, selDivisioni, selUm, selTipi, selScadenze, selStati, selLinee]);
+
+  // Tabella ordinata per frequenza (conteggio) decrescente
+  const tableRows = useMemo(
+    () => [...filtered].sort((a, b) => b.conteggio - a.conteggio),
+    [filtered],
+  );
+
+  const selectedRow = useMemo(
+    () => filtered.find((r) => r.id === selectedRowId) ?? filtered[0],
+    [filtered, selectedRowId],
+  );
+
+  // KPI "Num. difetti" (card del PBIR): totale conteggi filtrati
+  const totalDifetti = useMemo(
+    () => filtered.reduce((acc, r) => acc + r.conteggio, 0),
+    [filtered],
+  );
+
+  // Numero Difetti per Binario (clusteredBarChart)
+  const binChartData = useMemo<BinDatum[]>(
+    () => BIN_ORDER.map((name) => ({
+      name,
+      count: filtered.filter((r) => r.bin === name).reduce((acc, r) => acc + r.conteggio, 0),
+    })),
+    [filtered],
+  );
+
+  // Riga rappresentativa di un binario (per il drillthrough dalla barra)
+  const rowForBin = (binValue: string): FrequenzaRow | undefined => {
+    const rows = filtered.filter((r) => r.bin === binValue);
+    if (rows.length === 0) return undefined;
+    const first = rows[0];
+    return {
+      ...first,
+      id: `bin_${binValue}`,
+      conteggio: rows.reduce((acc, r) => acc + r.conteggio, 0),
+      kmRif: Math.min(...rows.map((r) => r.kmRif)),
+    };
+  };
+
+  /* ---------------- Mappa (azureMap) ---------------- */
+  useEffect(() => {
+    if (!mapRef.current || mapInstanceRef.current) return;
+
+    const map = L.map(mapRef.current, {
+      center: [45.550856133288704, 12.251054367500046],
+      zoom: 6.93,
+      zoomControl: true,
+      attributionControl: false,
+    });
+
+    L.tileLayer(DEFAULT_DARK_TILE_URL, {
+      attribution: DEFAULT_DARK_TILE_ATTRIBUTION,
+      maxZoom: 16,
+    }).addTo(map);
+
+    try {
+      L.geoJSON(rfiTracksGeoJson as any, {
+        style: () => ({ color: PBI_COLORS.textLight, weight: 2, opacity: 0.85 }),
+      }).addTo(map);
+    } catch (e) {
+      console.warn('GeoJSON render error:', e);
     }
+
+    const markers = L.layerGroup().addTo(map);
+    markersLayerRef.current = markers;
+    mapInstanceRef.current = map;
+
+    setTimeout(() => map.invalidateSize(), 150);
   }, []);
 
-  // Update Markers (lime green bubbles matching Screenshot 5)
+  // bubbleLayer: fill #99BD3C, stroke #4E601E, raggio 6..14
   useEffect(() => {
     if (!markersLayerRef.current || !mapInstanceRef.current) return;
     markersLayerRef.current.clearLayers();
 
-    filtered.forEach(item => {
-      const radius = Math.min(26, Math.max(9, Math.sqrt(item.conteggio) * 1.5));
-      const circle = L.circleMarker([item.lat, item.lng], {
+    const groups: Record<string, { lat: number; lng: number; count: number; name: string; rowId: string }> = {};
+    filtered.forEach((r) => {
+      const key = `${r.lat.toFixed(2)}_${r.lng.toFixed(2)}`;
+      if (!groups[key]) groups[key] = { lat: r.lat, lng: r.lng, count: 0, name: r.localita, rowId: r.id };
+      groups[key].count += r.conteggio;
+    });
+
+    Object.values(groups).forEach((g) => {
+      const radius = Math.min(14, Math.max(6, 6 + Math.sqrt(g.count)));
+      L.circleMarker([g.lat, g.lng], {
         radius,
-        fillColor: '#84cc16',
-        fillOpacity: 0.65,
-        color: '#bef264',
-        weight: 1.5,
-      });
-
-      circle.bindTooltip(
-        `<div class="text-xs p-1 font-sans">
-          <div class="font-bold text-lime-400">${item.localita} (${item.bin} Km ${item.kmRif})</div>
-          <div class="text-slate-300">Conteggio difetti: <span class="font-bold text-white">${item.conteggio}</span></div>
-        </div>`,
-        { direction: 'top', className: 'bg-slate-900 border border-slate-700 text-white rounded' }
-      );
-
-      circle.on('click', () => {
-        setSelectedRowId(item.id);
-      });
-
-      circle.addTo(markersLayerRef.current!);
+        fillColor: BIN_GREEN,
+        fillOpacity: 0.7,
+        color: '#4E601E',
+        weight: 1,
+      })
+        .bindTooltip(
+          `<div style="font-size:11px"><b>${g.name}</b><br/>Num. difetti: ${g.count}</div>`,
+          { direction: 'top' },
+        )
+        .on('click', () => setSelectedRowId(g.rowId))
+        .addTo(markersLayerRef.current!);
     });
   }, [filtered]);
 
   return (
-    <div className="bg-[#121316] text-[#e2e8f0] min-h-full flex flex-col space-y-2.5 font-sans select-none">
-      {/* Top Banner Row matching Screenshot 5 */}
-      <div className="flex flex-wrap items-center justify-between border-b border-[#2d3139] pb-2">
-        <div className="flex items-center space-x-3">
-          <div className="h-9 px-2.5 bg-white rounded flex items-center justify-center shadow-sm">
-            <span className="text-[#008542] font-black tracking-tighter text-base">RFI</span>
-            <span className="text-[#dc2626] font-bold text-[10px] ml-1 uppercase">FS</span>
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-[#f43f5e] tracking-tight">
-              Difetti di livello e scartamento - DOIT VE
-            </h1>
-            <div className="flex items-center space-x-4 text-xs mt-0.5">
-              <span className="text-white font-bold text-sm">Frequenza V3 e V4</span>
-              <span className="text-[#94a3b8]">Dati al: <strong className="text-white font-mono">{dataAggiornamento}</strong></span>
-            </div>
-          </div>
-        </div>
+    <PbiCanvas>
+      {/* ================= Sfondi / pannelli ================= */}
+      <PbiShape x={138.69230769230484} y={140.76923076923077} w={236.9230769230769} h={86.15384615384615} z={0} fill={PBI_COLORS.card} radius={8} />
+      <PbiShape x={0} y={218.09749407804514} w={647.2609400324149} h={88.16855753646676} z={1000} fill={PBI_COLORS.card} radius={8} />
+      <PbiShape x={0} y={65.45454545454545} w={278.46153846153845} h={85.38461538461539} z={3000} fill={PBI_COLORS.card} radius={8} />
+      <PbiShape x={365.1215559157212} y={141.06969205834685} w={282.1393841166937} h={85.05672609400324} z={5000} fill={PBI_COLORS.card} radius={7} />
+      <PbiShape x={269.2307692307691} y={64.61538461538461} w={219.23076923076923} h={85.38461538461539} z={8000} fill={PBI_COLORS.card} radius={8} />
+      <PbiShape x={0} y={413} w={211} h={271} z={12000} fill={PBI_COLORS.card} radius={5} />
+      <PbiShape x={640} y={0} w={640} h={417.27272727272725} z={14000} fill="#000000" radius={2} />
+      <PbiShape x={480.7692307692308} y={64.61538461538461} w={168.46153846153845} h={85.38461538461539} z={16000} fill={PBI_COLORS.panel} radius={7} />
+      <PbiShape x={0} y={140.76923076923077} w={148.46153846153845} h={85.38461538461539} z={17000} fill={PBI_COLORS.card} radius={8} />
+      <PbiShape x={0.8695652173913044} y={296.5217391304348} w={371.304347826087} h={120.86956521739131} z={18000} fill={PBI_COLORS.panel} radius={5} />
+      <PbiShape x={363.9130434782609} y={296.5217391304348} w={284.34782608695656} h={120.86956521739131} z={37000} fill={PBI_COLORS.card} radius={7} />
+      <PbiShape x={201.8181818181818} y={411.8181818181818} w={1078.181818181818} h={271.8181818181818} z={31000} fill={PBI_COLORS.tableRowSecondary} radius={5} />
 
-        <button
-          onClick={handleResetFilters}
-          className="flex items-center space-x-1 px-3 py-1 bg-[#1e222a] hover:bg-[#282d38] border border-[#3f4553] rounded text-xs font-semibold text-slate-200 transition-colors cursor-pointer shadow-sm"
-        >
-          <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-          <span>Reset Filtri</span>
-        </button>
-      </div>
+      {/* ================= Intestazione ================= */}
+      <PbiBox x={1} y={0} w={210} h={61.53846153846153} z={26000}>
+        <img
+          src="/assets/logo_ufficiale.png"
+          alt="RFI"
+          style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
+        />
+      </PbiBox>
+      <PbiText x={202} y={4} w={485} h={28} z={2000}
+        text="Difetti di livello e scartamento - DOIT VE" sizePt={20} bold color={ACCENT} />
+      <PbiText x={211} y={35} w={162} h={25} z={28000}
+        text="Frequenza V3 e V4" sizePt={15} bold color={PBI_COLORS.textLight} background={PBI_COLORS.canvas} />
+      <PbiText x={372.19226698812577} y={33.50695756924371} w={60} h={27} z={27000}
+        text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} align="right" vAlign="middle" background={PBI_COLORS.canvas} padding={2} />
+      <PbiText x={424.1153439112027} y={34.58388064616678} w={130.76923076923077} h={26.923076923076923} z={25000}
+        text={dataAggiornamento} sizePt={12} color={PBI_COLORS.textLight} background={PBI_COLORS.canvas} vAlign="middle" padding={2} />
 
-      {/* Upper Two-Column Layout exactly matching Screenshot 5 */}
-      <div className="grid grid-cols-12 gap-3 items-stretch">
-        {/* Left Side: Slicers & Charts (55% width) */}
-        <div className="col-span-12 lg:col-span-6 flex flex-col space-y-2.5">
-          {/* Row 1: Anno Avviso, Trimestre, Num. Difetti */}
-          <div className="grid grid-cols-12 gap-2">
-            <div className="col-span-5 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] flex flex-col justify-between shadow-sm">
-              <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1">Anno avviso</span>
-              <div className="grid grid-cols-5 gap-1">
-                {['2022', '2023', '2024', '2025', '2026'].map(y => {
-                  const isSelected = selectedAnni.includes(y);
-                  return (
-                    <button
-                      key={y}
-                      onClick={() => toggleSelection(selectedAnni, setSelectedAnni, y)}
-                      className={`py-1 text-center font-bold rounded-xs border text-[10px] cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-lime-600/30 border-lime-500 text-lime-300 shadow'
-                          : 'bg-[#141518] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
-                      }`}
-                    >
-                      {y}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+      {/* ================= Bottoni di navigazione ================= */}
+      <PbiButton x={560} y={29} w={88} h={45} z={33000} label="Reset Filtri" sizePt={9} onClick={handleResetFilters} />
+      <PbiButton x={1191.8181818181818} y={675.4545454545454} w={88} h={45} z={41000}
+        label="Drill V3 V4" sizePt={9} disabled={!selectedRow} onClick={() => selectedRow && onNavigateToDrill(selectedRow)} />
 
-            <div className="col-span-4 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] flex flex-col justify-between shadow-sm">
-              <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1">Trimestre</span>
-              <div className="grid grid-cols-4 gap-1">
-                {['1', '2', '3', '4'].map(q => {
-                  const isSelected = selectedTrimestri.includes(q);
-                  return (
-                    <button
-                      key={q}
-                      onClick={() => toggleSelection(selectedTrimestri, setSelectedTrimestri, q)}
-                      className={`py-1 text-center font-bold rounded-xs border text-[11px] cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-lime-600/30 border-lime-500 text-lime-300 shadow'
-                          : 'bg-[#141518] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
-                      }`}
-                    >
-                      {q}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+      {/* ================= Etichette dei filtri ================= */}
+      <PbiText x={16.153846153846153} y={84.61538461538461} w={245.3846153846154} h={16.923076923076923} z={11000}
+        text="  Anno avviso" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
+      <PbiText x={286.551208434105} y={82.73363000633466} w={183.09466344864578} h={18.18181818181818} z={15000}
+        text="  Trimestre" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
+      <PbiText x={155.67664263620264} y={159.2518080210388} w={199.56562343594783} h={18.188034188034187} z={9000}
+        text="  Unità Manutentiva" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
+      <PbiText x={17.692307692307693} y={161.53846153846152} w={111.53846153846153} h={17.692307692307693} z={21000}
+        text="   Divisione" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
+      <PbiText x={16} y={234} w={607} h={21} z={10000}
+        text="  Scadenza Avviso" sizePt={9} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
+      <PbiText x={17.826086956521742} y={311.304347826087} w={327.3913043478261} h={18.260869565217394} z={22000}
+        text="  Numero Difetti Binario" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
+      <PbiText x={381.0372771474879} y={157.1562149357935} w={250} h={18.46153846153846} z={34000}
+        text="  Tipo Avviso" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
+      <PbiText x={381.0372771474879} y={170.23313801271658} w={125.38461538461539} h={45.38461538461538} z={36000}
+        text={'V3 → Dif. livello\nV4 → Dif. scartamento'} sizePt={8} color={PBI_COLORS.textLight} />
+      <PbiText x={382.4275362318841} y={328.4057971014489} w={246.66666666666669} h={18.333333333333336} z={38000}
+        text="  Tipo Avviso" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
+      <PbiText x={382.0372066802904} y={341.34017768574836} w={125.38461538461539} h={45.38461538461538} z={40000}
+        text={'MISC → MISura Chiusa\nMIAP → MIsura Aperta'} sizePt={8} color={PBI_COLORS.textLight} />
 
-            {/* Num. Difetti KPI Card (Large lime green digits matching Screenshot 5) */}
-            <div className="col-span-3 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] flex flex-col items-center justify-center shadow-sm">
-              <span className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-wider">Num. difetti</span>
-              <span className="text-3xl font-black text-[#a3e635] font-mono leading-none mt-1">
-                12K
-              </span>
-            </div>
-          </div>
+      {/* ================= Slicer a tile ================= */}
+      <PbiTileSlicer x={0.7692307692307692} y={107.76223776223776} w={274.6153846153846} h={26.153846153846153} z={7000}
+        options={anniOptions} value={selAnni} onToggle={(v) => toggle(setSelAnni, v)} />
+      <PbiTileSlicer x={269.2307692307692} y={107.6923076923077} w={220} h={26.153846153846153} z={13000}
+        options={TRIMESTRI} value={selTrimestri} onToggle={(v) => toggle(setSelTrimestri, v)} />
+      <PbiTileSlicer x={138.46153846153845} y={181.53846153846152} w={236.9230769230769} h={29.23076923076923} z={4000}
+        options={UNITA_MANUTENTIVE} value={selUm} onToggle={(v) => toggle(setSelUm, v)} />
+      <PbiTileSlicer x={0.7692307692307692} y={183.84615384615384} w={147.69230769230768} h={27.69230769230769} z={19000}
+        options={DIVISIONI} value={selDivisioni} onToggle={(v) => toggle(setSelDivisioni, v)} />
+      <PbiTileSlicer x={0} y={260} w={647} h={27} z={6000}
+        options={SCADENZE} value={selScadenze} onToggle={(v) => toggle(setSelScadenze, v)} />
+      <PbiTileSlicer x={489.49881560902634} y={179.4639072434858} w={150} h={28.46153846153846} z={35000}
+        options={TIPI} value={selTipi} onToggle={(v) => toggle(setSelTipi, v)} />
+      <PbiTileSlicer x={489.2307692307692} y={350.7692307692308} w={160} h={28.46153846153846} z={39000}
+        options={STATI_MISURA} value={selStati} onToggle={(v) => toggle(setSelStati, v)} />
 
-          {/* Row 2: Divisione, Unità Manutentiva, Tipo Avviso */}
-          <div className="grid grid-cols-12 gap-2">
-            <div className="col-span-3 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] flex flex-col justify-between shadow-sm">
-              <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1">Divisione</span>
-              <div className="grid grid-cols-2 gap-1">
-                {['VEM1', 'VEM2'].map(div => {
-                  const isSelected = selectedDivisioni.includes(div);
-                  return (
-                    <button
-                      key={div}
-                      onClick={() => toggleSelection(selectedDivisioni, setSelectedDivisioni, div)}
-                      className={`py-1 text-center font-bold rounded-xs border text-[11px] cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-lime-600/30 border-lime-500 text-lime-300 shadow'
-                          : 'bg-[#141518] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
-                      }`}
-                    >
-                      {div}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+      {/* ================= Slicer a elenco ================= */}
+      <PbiListSlicer x={10} y={425} w={181} h={244} z={24000}
+        title="Linea InRete" options={MASTER_LINEE_INRETE} value={selLinee}
+        onToggle={(v) => toggle(setSelLinee, v)} itemColor={PBI_COLORS.textLight} />
 
-            <div className="col-span-5 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] flex flex-col justify-between shadow-sm">
-              <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1">Unità Manutentiva</span>
-              <div className="grid grid-cols-4 gap-1">
-                {['LVU1', 'LVU2', 'LVU3', 'LVU4'].map(lvu => {
-                  const isSelected = selectedUM.includes(lvu);
-                  return (
-                    <button
-                      key={lvu}
-                      onClick={() => toggleSelection(selectedUM, setSelectedUM, lvu)}
-                      className={`py-1 text-center font-bold rounded-xs border text-[11px] cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-lime-600/30 border-lime-500 text-lime-300 shadow'
-                          : 'bg-[#141518] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
-                      }`}
-                    >
-                      {lvu}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+      {/* ================= KPI Num. difetti ================= */}
+      <PbiText x={491.92932426425244} y={70.33566433566455} w={117} h={28} z={30000}
+        text="Num. difetti" sizePt={9} color={PBI_COLORS.textLight} />
+      <PbiText x={488.46153846153845} y={80} w={151.53846153846155} h={59.230769230769226} z={29000}
+        text={formatCount(totalDifetti)} sizePt={35} color={BIN_GREEN} align="center" vAlign="middle" />
 
-            <div className="col-span-4 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] flex flex-col justify-between shadow-sm">
-              <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1">Tipo Avviso</span>
-              <div className="grid grid-cols-2 gap-1">
-                {['V3', 'V4'].map(t => {
-                  const isSelected = selectedTipi.includes(t);
-                  return (
-                    <button
-                      key={t}
-                      onClick={() => toggleSelection(selectedTipi, setSelectedTipi, t)}
-                      className={`py-1 text-center font-bold rounded-xs border text-[11px] cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-lime-600/30 border-lime-500 text-lime-300 shadow'
-                          : 'bg-[#141518] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
-                      }`}
-                    >
-                      {t}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+      {/* ================= Grafico Numero Difetti Binario ================= */}
+      <BinBars x={18.260869565217394} y={316.5217391304348} w={337} h={96} z={23000}
+        data={binChartData} onSelect={(bin) => { const row = rowForBin(bin); if (row) onNavigateToDrill(row); }} />
 
-          {/* Row 3: Scadenza Avviso Slicer matching Screenshot 5 */}
-          <div className="bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] shadow-sm text-xs">
-            <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1 block">Scadenza Avviso</span>
-            <div className="grid grid-cols-2 sm:grid-cols-6 gap-1">
-              {['CHIUSO', 'SCAD.<10GG', 'SCAD.<30GG', 'SCAD.<60GG', 'SCAD.>60GG', 'SCADUTO'].map(scad => {
-                const isSelected = selectedScadenze.includes(scad);
-                return (
-                  <button
-                    key={scad}
-                    onClick={() => toggleSelection(selectedScadenze, setSelectedScadenze, scad)}
-                    className={`py-1 text-center font-bold rounded-xs border text-[10px] cursor-pointer transition-all ${
-                      isSelected
-                        ? 'bg-lime-600/30 border-lime-500 text-lime-300 shadow'
-                        : 'bg-[#141518] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
-                    }`}
-                  >
-                    {scad}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+      {/* ================= Mappa (azureMap) ================= */}
+      <PbiBox x={656.3636363636363} y={17.27272727272727} w={604.5454545454545} h={383.6363636363636} z={20000} style={{ overflow: 'hidden' }}>
+        <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+      </PbiBox>
 
-          {/* Row 4: Numero Difetti Binario & Tipo Avviso & Linea InRete */}
-          <div className="grid grid-cols-12 gap-2 flex-1 min-h-[200px]">
-            {/* Numero Difetti Binario horizontal bars */}
-            <div className="col-span-5 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] flex flex-col h-52 shadow-sm">
-              <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1">Numero Difetti Binario</span>
-              <div className="flex-1 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    layout="vertical"
-                    data={binarioChartData}
-                    margin={{ top: 2, right: 35, left: -10, bottom: 2 }}
-                  >
-                    <XAxis type="number" stroke="#64748b" fontSize={9} hide />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      stroke="#94a3b8"
-                      fontSize={9.5}
-                      tickLine={false}
-                      width={60}
-                    />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#181a20', borderColor: '#3f4553', fontSize: '11px', color: '#fff' }}
-                    />
-                    <Bar
-                      dataKey="count"
-                      fill="#84cc16"
-                      cursor="pointer"
-                      label={{ position: 'right', fill: '#cbd5e1', fontSize: 9.5, fontWeight: 700, formatter: (val: any) => `${(Number(val) / 1000).toFixed(1).replace('.', ',')}K` }}
-                    >
-                      {binarioChartData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill="#84cc16" />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Tipo Avviso (MIAP, MISC) */}
-            <div className="col-span-3 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] flex flex-col justify-between h-52 shadow-sm">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1 block">Tipo Avviso</span>
-                <span className="text-[9.5px] text-slate-400 block leading-tight">MISC = Misura Chiusa</span>
-                <span className="text-[9.5px] text-slate-400 block leading-tight">MIAP = Misura Aperta</span>
-              </div>
-              <div className="grid grid-cols-2 gap-1 mt-2">
-                {['MIAP', 'MISC'].map(st => {
-                  const isSelected = selectedStatiMisura.includes(st);
-                  return (
-                    <button
-                      key={st}
-                      onClick={() => toggleSelection(selectedStatiMisura, setSelectedStatiMisura, st)}
-                      className={`py-1.5 text-center font-bold rounded-xs border text-[11px] cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-lime-600/30 border-lime-500 text-lime-300 shadow'
-                          : 'bg-[#141518] border-[#383d47] text-[#94a3b8] hover:bg-[#25282e]'
-                      }`}
-                    >
-                      {st}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Linea InRete Checklist */}
-            <div className="col-span-4 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] flex flex-col h-52 shadow-sm">
-              <span className="text-[10px] uppercase font-bold text-[#94a3b8] mb-1">Linea InRete</span>
-              <div className="flex-1 overflow-y-auto space-y-1 pr-1 text-xs scrollbar-thin">
-                {lineeList.map(linea => {
-                  const isChecked = selectedLinee.includes(linea);
-                  return (
-                    <label
-                      key={linea}
-                      className="flex items-center space-x-2 py-0.5 px-1 hover:bg-[#252932] rounded cursor-pointer text-[#cbd5e1]"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => toggleSelection(selectedLinee, setSelectedLinee, linea)}
-                        className="rounded bg-[#141518] border-[#4b5563] text-lime-500 focus:ring-0 w-3.5 h-3.5"
-                      />
-                      <span className="truncate text-[10.5px]">{linea}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Side: Map Canvas taking entire Upper Right Quadrant (Matching Screenshot 5) */}
-        <div className="col-span-12 lg:col-span-6 flex flex-col bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] shadow-sm relative min-h-[380px] lg:min-h-full">
-          <div className="flex items-center justify-between pb-1.5 px-1 border-b border-[#2e333d] mb-1.5">
-            <div className="flex items-center space-x-1.5">
-              <Layers className="w-3.5 h-3.5 text-lime-400" />
-              <span className="text-xs font-bold text-white">Mappa Concentrazione Difetti</span>
-            </div>
-            <span className="text-[10px] text-slate-400 font-mono bg-[#141518] px-2 py-0.5 rounded border border-[#374151]">
-              ESRI Dark • Open GIS
-            </span>
-          </div>
-
-          <div className="flex-1 w-full min-h-[320px] rounded overflow-hidden relative border border-[#2d323d]">
-            <div ref={mapRef} className="w-full h-full" />
-          </div>
-
-          {/* Drill V3 V4 button at bottom-right matching Screenshot 5 */}
-          <div className="pt-2 flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">
-              Tratta selezionata: <strong className="text-lime-400 font-mono">{selectedRow?.localita || '-'} ({selectedRow?.bin} Km {selectedRow?.kmRif})</strong>
-            </span>
-            <button
-              onClick={() => onNavigateToDrill(selectedRow)}
-              className="bg-white hover:bg-slate-200 text-[#0f172a] text-xs font-bold px-3.5 py-1.5 rounded shadow border border-slate-300 flex items-center space-x-1.5 cursor-pointer transition-transform hover:scale-105 active:scale-95"
-            >
-              <span>Drill V3 V4</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Area: Table matching Screenshot 5 */}
-      <div className="bg-[#1c1f26] rounded-md border border-[#2e333d] overflow-hidden flex flex-col flex-1 shadow-sm min-h-[220px]">
-        <div className="px-3 py-1.5 bg-[#16181d] border-b border-[#2e333d] flex items-center justify-between text-xs shrink-0">
-          <span className="font-bold text-white">
-            Classifica Tratte per Frequenza Difetti ({filtered.length} righe)
-          </span>
-          <span className="text-[11px] text-[#94a3b8]">
-            Seleziona una riga per analizzare il dettaglio storico nella scheda Drill V3 V4
-          </span>
-        </div>
-
-        <div className="overflow-auto flex-1 min-h-[200px] max-h-[calc(100vh-480px)] scrollbar-thin">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#141518] sticky top-0 border-b border-[#2e333d] text-[#94a3b8] text-[10.5px] uppercase font-semibold">
+      {/* ================= Tabella (Punto di Misura) ================= */}
+      <PbiBox x={219.09090909090907} y={424.5454545454545} w={1046.3636363636363} h={243.63636363636363} z={32000}
+        style={{ border: `2px solid ${ACCENT}`, overflow: 'hidden', background: PBI_COLORS.tableRowSecondary }}>
+        <div className="scrollbar-thin" style={{ width: '100%', height: '100%', overflow: 'auto' }}>
+          <table style={{ borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', width: TABLE_WIDTH, fontSize: fontSizePx(8) }}>
+            <colgroup>
+              {TABLE_COLUMNS.map((c) => <col key={c.key} style={{ width: c.width }} />)}
+            </colgroup>
+            <thead>
               <tr>
-                <th className="py-2 px-2.5">Linea InRete</th>
-                <th className="py-2 px-2.5">SeTe primo livello</th>
-                <th className="py-2 px-2.5">Località/Tratta</th>
-                <th className="py-2 px-2.5">Sede tecnica</th>
-                <th className="py-2 px-2.5">Definizione della sede tecnica</th>
-                <th className="py-2 px-2.5">Bin.</th>
-                <th className="py-2 px-2.5">Km. rif.</th>
-                <th className="py-2 px-2.5 text-right">Conteggio di Val. difetto</th>
+                {TABLE_COLUMNS.map((c) => (
+                  <th
+                    key={c.key}
+                    style={{
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 1,
+                      background: PBI_COLORS.tableHeader,
+                      color: PBI_COLORS.textPrimary,
+                      fontWeight: 400,
+                      textAlign: 'left',
+                      padding: '3px 4px',
+                      borderRight: `1px solid ${BIN_GREEN}`,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {c.label}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#252932] text-[11px] font-mono text-[#cbd5e1]">
-              {filtered.map(row => {
+            <tbody>
+              {tableRows.map((row, i) => {
                 const isSelected = row.id === selectedRowId;
                 return (
                   <tr
                     key={row.id}
-                    onClick={() => setSelectedRowId(row.id)}
-                    className={`cursor-pointer transition-colors ${
-                      isSelected
-                        ? 'bg-lime-950/40 text-white font-bold border-l-4 border-lime-500'
-                        : 'hover:bg-[#20242e]'
-                    }`}
+                    onClick={() => { setSelectedRowId(row.id); onNavigateToDrill(row); }}
+                    style={{
+                      background: isSelected ? '#000000' : (i % 2 === 0 ? PBI_COLORS.tableRowPrimary : PBI_COLORS.tableRowSecondary),
+                      cursor: 'pointer',
+                    }}
                   >
-                    <td className="py-1.5 px-2.5 font-sans font-semibold text-white">{row.linea}</td>
-                    <td className="py-1.5 px-2.5 text-lime-400 font-bold">{row.setePrimoLivello}</td>
-                    <td className="py-1.5 px-2.5 font-sans font-bold text-white">{row.localita}</td>
-                    <td className="py-1.5 px-2.5 text-slate-300">{row.sete}</td>
-                    <td className="py-1.5 px-2.5 font-sans text-slate-300 truncate max-w-[220px]">{row.definizione}</td>
-                    <td className="py-1.5 px-2.5">{row.bin}</td>
-                    <td className="py-1.5 px-2.5">{row.kmRif}</td>
-                    <td className="py-1.5 px-2.5 text-right font-black text-white">{row.conteggio}</td>
+                    {TABLE_COLUMNS.map((c) => {
+                      const value = c.value(row);
+                      return (
+                        <td
+                          key={c.key}
+                          title={value}
+                          style={{
+                            padding: '2px 4px',
+                            color: i % 2 === 0 ? PBI_COLORS.textPrimary : PBI_COLORS.textMuted,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {value}
+                        </td>
+                      );
+                    })}
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-      </div>
-    </div>
+      </PbiBox>
+
+      {/* ================= Stato vuoto ================= */}
+      {iw67.length === 0 && (
+        <PbiBox x={0} y={0} w={1280} h={720} z={65000}
+          style={{ background: 'rgba(0,0,0,0.72)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+          <span style={{ color: PBI_COLORS.textPrimary, fontSize: 15, fontWeight: 700 }}>Web app non alimentata (0 record)</span>
+          <span style={{ color: PBI_COLORS.textMuted, fontSize: 12 }}>
+            Alimenta la web app con i file SAP (es. IW67, IW29) oppure carica i dati demo.
+          </span>
+          <div style={{ display: 'flex', gap: 10 }}>
+            {onOpenFileLoader && (
+              <button
+                type="button"
+                onClick={onOpenFileLoader}
+                style={{ background: ACCENT, color: '#111', border: 'none', borderRadius: 4, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Alimenta Web App
+              </button>
+            )}
+            {onLoadDemoData && (
+              <button
+                type="button"
+                onClick={onLoadDemoData}
+                style={{ background: PBI_COLORS.button, color: PBI_COLORS.textLight, border: `1px solid ${PBI_COLORS.tileBorder}`, borderRadius: 4, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Carica Demo
+              </button>
+            )}
+          </div>
+        </PbiBox>
+      )}
+    </PbiCanvas>
   );
 };
+
+/* -------------------- Colonne del tableEx ("Punto di Misura") -------------------- */
+interface FreqColumn {
+  key: string;
+  label: string;
+  width: number;
+  value: (r: FrequenzaRow) => string;
+}
+
+const TABLE_COLUMNS: FreqColumn[] = [
+  { key: 'linea', label: 'Linea InRete', width: 152.65789809905354, value: (r) => r.linea },
+  { key: 'setePrimoLivello', label: 'SeTe primo livello', width: 90, value: (r) => r.setePrimoLivello },
+  { key: 'localita', label: 'Località/Tratta', width: 232.1312613672112, value: (r) => r.localita },
+  { key: 'sete', label: 'Sede tecnica', width: 95, value: (r) => r.sete },
+  { key: 'definizione', label: 'Definizione della sede tecnica', width: 254.5744455240934, value: (r) => r.definizione },
+  { key: 'bin', label: 'Bin.', width: 48, value: (r) => r.bin },
+  { key: 'kmRif', label: 'Km. rif.', width: 51.620745542949756, value: (r) => String(r.kmRif) },
+  { key: 'conteggio', label: 'Conteggio di Val. difetto', width: 90, value: (r) => String(r.conteggio) },
+];
+
+const TABLE_WIDTH = TABLE_COLUMNS.reduce((sum, c) => sum + c.width, 0);

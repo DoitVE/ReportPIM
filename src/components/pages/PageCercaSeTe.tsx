@@ -7,6 +7,7 @@ import {
   PbiText,
   PbiListSlicer,
   PbiButton,
+  PbiBackButton,
   PBI_COLORS,
   fontSizePx,
 } from '../pbi/primitives';
@@ -254,43 +255,44 @@ export const PageCercaSeTe: React.FC<PageCercaSeTeProps> = ({
       <PbiShape x={499.32992005748656} y={52.92553669271536} w={256.6208569118836} h={94.16329830234437} z={16000} fill={PBI_COLORS.card} radius={8} />
       <PbiShape x={1073.8812539297578} y={25.792688403844426} w={205.91754244139045} h={120.03233629749393} z={18000} fill={PBI_COLORS.card} radius={8} />
 
-      {/* ================= Intestazione ================= */}
-      <PbiText x={308} y={12} w={339} h={67} z={0} text="Difetti di binario - DOIT VE" sizePt={20} bold color={RED} />
-      <PbiText x={307.77777777777777} y={45.55555555555556} w={194.44444444444443} h={25.555555555555554} z={11000}
-        text="Cerca per SeTe V5" sizePt={15} bold color={PBI_COLORS.textLight} />
-      <PbiBox x={39.8992443324937} y={11.788413098236775} w={249.37027707808562} h={74.35768261964735} z={8000}>
+      {/* ================= Intestazione e Bottoni ================= */}
+      <PbiBackButton x={15} y={14} size={32} onClick={onBack} />
+
+      <PbiBox x={55} y={8} w={150} h={48} z={8000}>
         <img src="/assets/logo_ufficiale.png" alt="RFI" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }} />
       </PbiBox>
-      <PbiText x={241.44444444444417} y={69.99999999999996} w={118} h={28} z={9000}
-        text="Dati al:" sizePt={11} color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
-      <PbiText x={349.44444444444434} y={70.99999999999996} w={131} h={27} z={5000}
-        text={dataAggiornamento} sizePt={12} color={PBI_COLORS.textLight} vAlign="middle" />
 
-      {/* ================= Bottoni ================= */}
-      <PbiButton x={0} y={0} w={99.74811083123424} h={39.8992443324937} z={12000} label="Indietro" sizePt={9} onClick={onBack} />
-      <PbiButton x={624.4444444444445} y={5.555555555555555} w={122.22222222222221} h={40} z={20000} label="Reset Filtri" sizePt={9} onClick={handleResetFilters} />
+      <PbiText x={215} y={4} w={260} h={28} z={0} text="Difetti di binario - DOIT VE" sizePt={18} bold color={RED} />
+      <PbiText x={215} y={32} w={160} h={22} z={11000}
+        text="Cerca per SeTe V5" sizePt={14} bold color={PBI_COLORS.textLight} />
+      <PbiText x={215} y={54} w={50} h={20} z={9000}
+        text="Dati al:" sizePt={10} color={PBI_COLORS.textMuted} vAlign="middle" />
+      <PbiText x={268} y={54} w={120} h={20} z={5000}
+        text={dataAggiornamento} sizePt={11} color={PBI_COLORS.textLight} vAlign="middle" />
 
-      {/* ================= Slicer ================= */}
-      <PbiListSlicer x={763.8956521739132} y={64.55072463768114} w={143.58260869565217} h={67.89565217391305} z={10000}
-        title="Cerca Avviso" options={avvisiList} value={selAvviso} onToggle={(v) => toggle(setSelAvviso, v)}
-        searchable itemColor={PBI_COLORS.textLight} itemSizePt={10}
-        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={12} />
-      <PbiListSlicer x={933.0822865796463} y={62.32850241545894} w={129.11304347826086} h={72.34782608695652} z={14000}
-        title="Cerca PdM" options={pdmOptions} value={selPdm} onToggle={(v) => toggle(setSelPdm, v)}
-        searchable itemColor={PBI_COLORS.textLight} itemSizePt={10}
-        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={12} />
-      <PbiListSlicer x={514.8513428545765} y={64.30791341058118} w={219.36944219886823} h={72.43330638641875} z={17000}
+      <PbiButton x={480} y={10} w={90} h={34} z={20000} label="Reset Filtri" sizePt={9} onClick={handleResetFilters} />
+
+      {/* ================= Slicer Superiori ================= */}
+      <PbiListSlicer x={580} y={8} w={150} h={66} z={17000}
         title="Cerca Sede tecnica" options={sediList} value={selSede} onToggle={(v) => toggle(setSelSede, v)}
-        searchable itemColor={PBI_COLORS.textLight} itemSizePt={10}
-        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={12} />
+        searchable itemColor={PBI_COLORS.textLight} itemSizePt={9}
+        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={10} />
+      <PbiListSlicer x={740} y={8} w={120} h={66} z={10000}
+        title="Cerca Avviso" options={avvisiList} value={selAvviso} onToggle={(v) => toggle(setSelAvviso, v)}
+        searchable itemColor={PBI_COLORS.textLight} itemSizePt={9}
+        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={10} />
+      <PbiListSlicer x={870} y={8} w={120} h={66} z={14000}
+        title="Cerca PdM" options={pdmOptions} value={selPdm} onToggle={(v) => toggle(setSelPdm, v)}
+        searchable itemColor={PBI_COLORS.textLight} itemSizePt={9}
+        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={10} />
 
       {/* Slicer "Anno" (mode Between) */}
-      <PbiBox x={1086.8686868686864} y={41.313131313131315} w={179.3939393939394} h={92.12121212121212} z={19000}
+      <PbiBox x={1000} y={8} w={265} h={66} z={19000}
         style={{ background: PBI_COLORS.card, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ background: SLICER_YELLOW, color: HEADER_SLICER, fontSize: fontSizePx(12), padding: '3px 6px', flex: '0 0 auto' }}>
+        <div style={{ background: SLICER_YELLOW, color: HEADER_SLICER, fontSize: fontSizePx(10), padding: '2px 6px', flex: '0 0 auto' }}>
           Anno
         </div>
-        <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6, padding: '4px 8px' }}>
+        <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4, padding: '2px 8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
               type="number"

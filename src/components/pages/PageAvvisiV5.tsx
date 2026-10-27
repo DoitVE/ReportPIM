@@ -271,21 +271,21 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
       <PbiShape x={447} y={66} w={203} h={86} z={21} fill={PBI_COLORS.panel} radius={7} />
 
       {/* ---------------- Intestazione ---------------- */}
-      <PbiBox x={10} y={3.8461538461538458} w={210} h={61.538461538461533} z={18000}>
+      <PbiBox x={10} y={4} w={200} h={58} z={18000}>
         <img
           src="/assets/logo_ufficiale.png"
           alt="RFI"
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiText x={233.07692307692307} y={3.8461538461538458} w={343.84615384615381} h={27.69230769230769} z={16000}
+      <PbiText x={220} y={4} w={380} h={28} z={16000}
         text="Difetti di binario - DOIT VE" sizePt={20} bold color={PBI_COLORS.accent} />
-      <PbiText x={233} y={35} w={84} h={25} z={20000} text="Avvisi V5" sizePt={15} bold color={PBI_COLORS.textLight} />
-      <PbiText x={335.625} y={33.125} w={70} h={38.75} z={19000} text="Dati al:" sizePt={12}
+      <PbiText x={220} y={34} w={90} h={25} z={20000} text="Avvisi V5" sizePt={15} bold color={PBI_COLORS.textLight} />
+      <PbiText x={315} y={33} w={55} h={26} z={19000} text="Dati al:" sizePt={11}
         color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
-      <PbiText x={405.625} y={31.25} w={122.5} h={35} z={17000} text={dataAggiornamento} sizePt={12}
-        color={PBI_COLORS.textLight} background={PBI_COLORS.canvas} vAlign="middle" padding={2} />
-      <PbiButton x={554} y={31} w={96.36363636363636} h={44.54545454545454} z={25000} label="Reset Filtri" onClick={handleResetFilters} />
+      <PbiText x={375} y={33} w={150} h={26} z={17000} text={dataAggiornamento} sizePt={11}
+        color={PBI_COLORS.textLight} vAlign="middle" />
+      <PbiButton x={545} y={26} w={95} h={34} z={25000} label="Reset Filtri" onClick={handleResetFilters} />
 
       {/* ---------------- Etichette dei filtri ---------------- */}
       <PbiText x={28.571428571428566} y={86.190476190476176} w={112.38095238095238} h={18} z={9000}
@@ -308,20 +308,20 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
         options={SCADENZE} value={selectedScadenze} onToggle={(v) => toggle(setSelectedScadenze, v)} />
 
       {/* ---------------- Slicer a elenco ---------------- */}
-      <PbiListSlicer x={13.076923076923077} y={311.53846153846155} w={179.23076923076923} h={163.07692307692307} z={15000}
+      <PbiListSlicer x={13.076923076923077} y={308} w={179.23076923076923} h={168} z={15000}
         title="Linea InRete" options={lineeList} value={selectedLinee} onToggle={(v) => toggle(setSelectedLinee, v)} />
-      <PbiListSlicer x={457} y={312} w={176} h={163} z={27000}
+      <PbiListSlicer x={455} y={308} w={178} h={128} z={27000}
         title="Classificazione stato" options={CLASSIFICAZIONI} value={selectedClassificazioni}
         onToggle={(v) => toggle(setSelectedClassificazioni, v)} itemColor={PBI_COLORS.textLight} />
 
       {/* ---------------- KPI Num. difetti ---------------- */}
-      <PbiText x={457} y={72} w={128} h={28} z={22000} text="Num. difetti" sizePt={12} color={PBI_COLORS.textLight} />
-      <PbiBox x={457} y={82} w={181} h={59} z={21000} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <PbiText x={457} y={70} w={175} h={22} z={22000} text="Num. difetti" sizePt={11} color={PBI_COLORS.textLight} align="center" />
+      <PbiBox x={457} y={88} w={175} h={55} z={21000} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontSize: fontSizePx(35), color: PBI_COLORS.accent, lineHeight: 1 }}>{filtered.length}</span>
       </PbiBox>
 
       {/* ---------------- Grafico a barre Classe Provvedimento ---------------- */}
-      <PbiBox x={220} y={291.76470588235293} w={221.1764705882353} h={194.11764705882354} z={11000} style={{ overflow: 'hidden' }}>
+      <PbiBox x={205} y={298} w={235} h={180} z={11000} style={{ overflow: 'hidden' }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart layout="vertical" data={classeChartData} margin={{ top: 5, right: 26, left: 0, bottom: 0 }}>
             <XAxis type="number" hide />
@@ -340,11 +340,11 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
       </PbiBox>
 
       {/* ---------------- Drill PdM/avviso ---------------- */}
-      <PbiButton x={642.92191435768257} y={444.33249370277076} w={123.3249370277078} h={44.433249370277075} z={26500}
+      <PbiButton x={500} y={444} w={130} h={34} z={26500} variant="light"
         label="Drill PdM/avviso" disabled={!selectedItem} onClick={() => selectedItem && onNavigateToDrill(selectedItem)} />
 
       {/* ---------------- Tabella (20 colonne) ---------------- */}
-      <PbiBox x={14.545454545454545} y={491.81818181818176} w={1250.9090909090908} h={214.54545454545453} z={24000}
+      <PbiBox x={14.545454545454545} y={486} w={1250.9090909090908} h={222} z={24000}
         style={{ border: `2px solid ${PBI_COLORS.accent}`, overflow: 'hidden', background: PBI_COLORS.tableRowSecondary }}>
         <div className="scrollbar-thin" style={{ width: '100%', height: '100%', overflow: 'auto' }}>
           <table style={{ borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', width: TABLE_WIDTH, fontSize: fontSizePx(8) }}>

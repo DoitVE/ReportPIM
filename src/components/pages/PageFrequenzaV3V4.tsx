@@ -392,25 +392,25 @@ export const PageFrequenzaV3V4: React.FC<PageFrequenzaV3V4Props> = ({
       <PbiShape x={201.8181818181818} y={411.8181818181818} w={1078.181818181818} h={271.8181818181818} z={31000} fill={PBI_COLORS.tableRowSecondary} radius={5} />
 
       {/* ================= Intestazione ================= */}
-      <PbiBox x={1} y={0} w={210} h={61.53846153846153} z={26000}>
+      <PbiBox x={10} y={4} w={200} h={58} z={26000}>
         <img
           src="/assets/logo_ufficiale.png"
           alt="RFI"
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiText x={202} y={4} w={485} h={28} z={2000}
+      <PbiText x={220} y={4} w={420} h={28} z={2000}
         text="Difetti di livello e scartamento - DOIT VE" sizePt={20} bold color={ACCENT} />
-      <PbiText x={211} y={35} w={162} h={25} z={28000}
+      <PbiText x={220} y={34} w={180} h={25} z={28000}
         text="Frequenza V3 e V4" sizePt={15} bold color={PBI_COLORS.textLight} background={PBI_COLORS.canvas} />
-      <PbiText x={372.19226698812577} y={33.50695756924371} w={60} h={27} z={27000}
-        text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} align="right" vAlign="middle" background={PBI_COLORS.canvas} padding={2} />
-      <PbiText x={424.1153439112027} y={34.58388064616678} w={130.76923076923077} h={26.923076923076923} z={25000}
-        text={dataAggiornamento} sizePt={12} color={PBI_COLORS.textLight} background={PBI_COLORS.canvas} vAlign="middle" padding={2} />
+      <PbiText x={360} y={33} w={55} h={26} z={27000}
+        text="Dati al:" sizePt={11} color={PBI_COLORS.textMuted} align="right" vAlign="middle" background={PBI_COLORS.canvas} />
+      <PbiText x={420} y={33} w={130} h={26} z={25000}
+        text={dataAggiornamento} sizePt={11} color={PBI_COLORS.textLight} vAlign="middle" background={PBI_COLORS.canvas} />
 
       {/* ================= Bottoni di navigazione ================= */}
-      <PbiButton x={560} y={29} w={88} h={45} z={33000} label="Reset Filtri" sizePt={9} onClick={handleResetFilters} />
-      <PbiButton x={1191.8181818181818} y={675.4545454545454} w={88} h={45} z={41000}
+      <PbiButton x={550} y={26} w={95} h={34} z={33000} label="Reset Filtri" sizePt={9} onClick={handleResetFilters} />
+      <PbiButton x={1155} y={672} w={110} h={34} z={41000} variant="light"
         label="Drill V3 V4" sizePt={9} disabled={!selectedRow} onClick={() => selectedRow && onNavigateToDrill(selectedRow)} />
 
       {/* ================= Etichette dei filtri ================= */}

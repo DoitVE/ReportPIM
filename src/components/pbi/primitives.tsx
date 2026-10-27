@@ -375,34 +375,97 @@ interface PbiButtonProps {
   sizePt?: number;
   disabled?: boolean;
   onClick?: () => void;
+  variant?: 'dark' | 'light';
 }
 
-/** Riproduce un `actionButton` (rettangolo arrotondato, riempimento #0F1012). */
+/** Riproduce un `actionButton` di Power BI (pillola scura di default o bianca per i drillthrough). */
 export const PbiButton: React.FC<PbiButtonProps> = ({
-  x, y, w, h, z, label, sizePt = 9, disabled, onClick,
-}) => (
-  <PbiBox x={x} y={y} w={w} h={h} z={z}>
+  x, y, w, h, z, label, sizePt = 9, disabled, onClick, variant = 'dark',
+}) => {
+  const isLight = variant === 'light';
+  return (
+    <PbiBox x={x} y={y} w={w} h={h} z={z}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onClick}
+        style={{
+          width: '100%',
+          height: '100%',
+          background: isLight
+            ? (disabled ? '#E1DFDD' : '#FFFFFF')
+            : (disabled ? '#16171A' : PBI_COLORS.button),
+          color: isLight
+            ? (disabled ? '#A19F9D' : '#1E1E1E')
+            : (disabled ? '#64748B' : PBI_COLORS.textLight),
+          fontSize: fontSizePx(sizePt),
+          fontWeight: isLight ? 600 : 500,
+          border: isLight
+            ? '1px solid rgba(0,0,0,0.25)'
+            : '1px solid rgba(255,255,255,0.28)',
+          borderRadius: 18,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.6 : 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: isLight
+            ? '0 2px 6px rgba(0,0,0,0.35)'
+            : '0 2px 6px rgba(0,0,0,0.5)',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        {label}
+      </button>
+    </PbiBox>
+  );
+};
+
+/**
+ * Pulsante circolare nativo Power BI "Indietro" con freccia a sinistra,
+ * riprodotto esattamente come nei visual del report.
+ */
+export const PbiBackButton: React.FC<{
+  x?: number;
+  y?: number;
+  z?: number;
+  size?: number;
+  title?: string;
+  onClick: () => void;
+}> = ({ x = 15, y = 14, z = 35000, size = 32, title = "Torna alla pagina precedente", onClick }) => (
+  <PbiBox x={x} y={y} w={size} h={size} z={z}>
     <button
       type="button"
-      disabled={disabled}
       onClick={onClick}
+      title={title}
       style={{
         width: '100%',
         height: '100%',
-        background: PBI_COLORS.button,
-        color: PBI_COLORS.textLight,
-        fontSize: fontSizePx(sizePt),
-        border: '1px solid rgba(255,255,255,0.25)',
-        borderRadius: 18,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.45 : 1,
+        borderRadius: '50%',
+        background: '#1F2023',
+        border: '1.5px solid rgba(255, 255, 255, 0.45)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
+        cursor: 'pointer',
+        boxShadow: '0 2px 5px rgba(0,0,0,0.4)',
+        padding: 0,
       }}
     >
-      {label}
+      <svg
+        width={size * 0.55}
+        height={size * 0.55}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#E6E6E6"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <line x1="19" y1="12" x2="5" y2="12" />
+        <polyline points="12 19 5 12 12 5" />
+      </svg>
     </button>
   </PbiBox>
 );
+

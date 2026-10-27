@@ -7,6 +7,7 @@ import {
   PbiBox,
   PbiShape,
   PbiText,
+  PbiBackButton,
   PBI_COLORS,
   fontSizePx,
 } from '../pbi/primitives';
@@ -24,13 +25,12 @@ const GRID_RED = '#F26D6D';
 const GREEN = '#99BD3C';
 
 const COL_WIDTHS = [
-  230.34, 30.91, 62.73, 64.55, 61.82, 50.00,
-  285.44, 45.45, 70.78, 71.86, 70.96, 104.93, 104.93,
+  85, 80, 42, 80, 68, 68, 75, 140, 240, 85, 85, 65, 65,
 ];
 
 const HEADERS = [
-  'Avviso', 'Data', 'Tipo', 'Codice', 'Km inizio', 'Km fine',
-  'Val. difetto', 'Testo', 'Descrizione', 'DataEsec.',
+  'Avviso', 'Data Avviso', 'Tipo', 'Codice Misura', 'Km inizio', 'Km fine',
+  'Val. difetto', 'Testo', 'Descrizione', 'Data Esecuzione',
   'Data Fine Richiesta', 'Stato sist.', 'Stato',
 ];
 
@@ -79,25 +79,28 @@ const MultiRowCard: React.FC<{
   x: number; y: number; w: number; h: number; z: number;
   items: { label: string; value: string | number }[];
 }> = ({ x, y, w, h, z, items }) => (
-  <PbiBox x={x} y={y} w={w} h={h} z={z} style={{ display: 'flex', background: CARD_BG }}>
+  <PbiBox x={x} y={y} w={w} h={h} z={z} style={{ display: 'flex', background: CARD_BG, borderRadius: 2 }}>
     <div style={{ width: 4, background: CARD_BAR, flex: '0 0 auto' }} />
-    <div style={{ display: 'flex', flex: '1 1 auto', padding: 20, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flex: '1 1 auto', padding: '6px 12px', alignItems: 'center' }}>
       {items.map((item, i) => (
         <div key={i} style={{
-          flex: '1 1 0', minWidth: 0, padding: '0 8px',
+          flex: '1 1 0', minWidth: 0, padding: '0 10px',
           borderRight: i < items.length - 1 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+          display: 'flex', flexDirection: 'column', justifyContent: 'center',
         }}>
+          {/* Valore in alto esattamente come in Power BI */}
           <div style={{
-            fontSize: fontSizePx(11), color: PBI_COLORS.textMuted,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {item.label}
-          </div>
-          <div style={{
-            fontSize: fontSizePx(10), color: PBI_COLORS.textLight, fontWeight: 700,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            fontSize: fontSizePx(11), color: PBI_COLORS.textPrimary, fontWeight: 700,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.25,
           }}>
             {String(item.value)}
+          </div>
+          {/* Etichetta in basso */}
+          <div style={{
+            fontSize: fontSizePx(9), color: PBI_COLORS.textMuted,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2, marginTop: 2,
+          }}>
+            {item.label}
           </div>
         </div>
       ))}
@@ -166,49 +169,41 @@ export const PageDrillFrequenzaV3V4: React.FC<PageDrillFrequenzaV3V4Props> = ({
 
   return (
     <PbiCanvas>
-      {/* z=0: Back button */}
-      <PbiBox x={0} y={0} w={100} h={40} z={0}>
-        <button onClick={onBack} style={{
-          width: '100%', height: '100%', background: 'transparent',
-          border: 'none', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <ArrowLeft color={PBI_COLORS.textMuted} size={20} />
-        </button>
+      {/* z=35000: Native Power BI Back Button */}
+      <PbiBackButton x={15} y={14} size={32} onClick={onBack} />
+
+      {/* z=5000: Logo */}
+      <PbiBox x={55} y={8} w={150} h={46} z={5000}>
+        <img src="/assets/logo_ufficiale.png" alt="Logo"
+          style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }} />
       </PbiBox>
 
       {/* z=3000: Title */}
-      <PbiText x={238.67} y={3.95} w={485} h={28} z={3000}
+      <PbiText x={215} y={4} w={440} h={28} z={3000}
         text="Difetti di livello e scartamento - DOIT VE"
         sizePt={20} bold color={PBI_COLORS.accent} />
 
       {/* z=7000: Drill label */}
-      <PbiText x={247.71} y={34.95} w={204} h={25} z={7000}
+      <PbiText x={215} y={34} w={200} h={25} z={7000}
         text="Drill frequenza V3 V4"
         sizePt={15} bold color={PBI_COLORS.textLight} />
 
-      {/* z=5000: Logo */}
-      <PbiBox x={34.45} y={0} w={210} h={61.54} z={5000}>
-        <img src="/assets/logo_ufficiale.png" alt="Logo"
-          style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-      </PbiBox>
-
       {/* z=6000: "Dati al:" label */}
-      <PbiText x={502.07} y={34.22} w={60} h={27} z={6000}
-        text="Dati al:" sizePt={10} color={PBI_COLORS.textMuted}
+      <PbiText x={425} y={33} w={55} h={26} z={6000}
+        text="Dati al:" sizePt={11} color={PBI_COLORS.textMuted}
         align="right" vAlign="middle" />
 
       {/* z=4000: DATA_ORA card */}
-      <PbiBox x={553.99} y={35.29} w={130.77} h={26.92} z={4000}
+      <PbiBox x={485} y={33} w={130} h={26} z={4000}
         style={{ background: PBI_COLORS.canvas, display: 'flex',
-          alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontSize: fontSizePx(12), color: PBI_COLORS.textLight }}>
+          alignItems: 'center', justifyContent: 'flex-start' }}>
+        <span style={{ fontSize: fontSizePx(11), color: PBI_COLORS.textLight }}>
           {dataAggiornamento}
         </span>
       </PbiBox>
 
       {/* z=1000: MultiRowCard 1 — Linea, SeTe, Località, LVU */}
-      <MultiRowCard x={12.35} y={95.29} w={1262.35} h={50} z={1000}
+      <MultiRowCard x={15} y={74} w={1250} h={50} z={1000}
         items={[
           { label: 'Linea InRete', value: selectedRow.linea },
           { label: 'SeTe primo livello', value: selectedRow.setePrimoLivello },
@@ -217,7 +212,7 @@ export const PageDrillFrequenzaV3V4: React.FC<PageDrillFrequenzaV3V4Props> = ({
         ]} />
 
       {/* z=2000: MultiRowCard 2 — Sede tecnica, Definizione, Bin, Km rif, Conteggio */}
-      <MultiRowCard x={12.35} y={145.29} w={1262.35} h={61.76} z={2000}
+      <MultiRowCard x={15} y={130} w={1250} h={52} z={2000}
         items={[
           { label: 'Sede tecnica', value: selectedRow.sete },
           { label: 'Definizione della sede tecnica', value: selectedRow.definizione },
@@ -227,13 +222,13 @@ export const PageDrillFrequenzaV3V4: React.FC<PageDrillFrequenzaV3V4Props> = ({
         ]} />
 
       {/* z=8000: Banda shape */}
-      <PbiShape x={0} y={210} w={1280} h={510} z={8000}
+      <PbiShape x={0} y={190} w={1280} h={530} z={8000}
         fill={PBI_COLORS.band} radius={2} />
 
       {/* z=9000: TableEx — 13 columns */}
-      <PbiBox x={12.35} y={222.94} w={1254.71} h={483.53} z={9000}
+      <PbiBox x={15} y={198} w={1250} h={506} z={9000}
         style={{ background: PBI_COLORS.band, overflow: 'hidden',
-          border: `4px solid ${GRID_RED}` }}>
+          border: `2px solid ${GRID_RED}` }}>
         <div style={{ height: '100%', overflowY: 'auto' }}>
           <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
             <colgroup>

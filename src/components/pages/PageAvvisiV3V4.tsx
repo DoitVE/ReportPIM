@@ -340,22 +340,22 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
       <PbiShape x={0} y={479.09090909090907} w={1280} h={240.90909090909088} z={28000} fill={PBI_COLORS.band} radius={5} />
 
       {/* ================= Intestazione ================= */}
-      <PbiBox x={1} y={0} w={210} h={61.53846153846153} z={23000}>
+      <PbiBox x={10} y={4} w={200} h={58} z={23000}>
         <img
           src="/assets/logo_ufficiale.png"
           alt="RFI"
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiText x={202} y={4} w={485} h={28} z={2000}
+      <PbiText x={220} y={4} w={420} h={28} z={2000}
         text="Difetti di livello e scartamento - DOIT VE" sizePt={20} bold color={RED} />
-      <PbiText x={210.71428571428572} y={34.285714285714285} w={129.2857142857143} h={25.714285714285715} z={25000}
+      <PbiText x={220} y={34} w={125} h={25} z={25000}
         text="Avvisi V3 e V4" sizePt={15} bold color={PBI_COLORS.textLight} background={PBI_COLORS.canvas} />
-      <PbiText x={352.4937445015781} y={33.29907670524769} w={61} h={28} z={24000}
-        text="Dati al:" sizePt={12} color={PBI_COLORS.textMuted} align="right" vAlign="middle" background={PBI_COLORS.canvas} />
-      <PbiText x={405.49374450157785} y={34.44193384810484} w={130.71428571428572} h={27.142857142857146} z={22000}
-        text={dataAggiornamento} sizePt={12} color={PBI_COLORS.textLight} vAlign="middle" background={PBI_COLORS.canvas} />
-      <PbiButton x={555.7142857142858} y={34.285714285714285} w={87.85714285714286} h={38.57142857142858} z={30000}
+      <PbiText x={350} y={33} w={55} h={26} z={24000}
+        text="Dati al:" sizePt={11} color={PBI_COLORS.textMuted} align="right" vAlign="middle" background={PBI_COLORS.canvas} />
+      <PbiText x={410} y={33} w={130} h={26} z={22000}
+        text={dataAggiornamento} sizePt={11} color={PBI_COLORS.textLight} vAlign="middle" background={PBI_COLORS.canvas} />
+      <PbiButton x={550} y={26} w={95} h={34} z={30000}
         label="Reset Filtri" sizePt={9} onClick={handleResetFilters} />
 
       {/* ================= Etichette dei filtri ================= */}
@@ -390,13 +390,13 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
       <PbiText x={380} y={172.3076923076923} w={125.38461538461539} h={45.38461538461538} z={33000}
         text={'V3 → Dif. livello\nV4 → Dif. scartamento'} sizePt={8} color={PBI_COLORS.textLight} />
 
-      {/* ================= KPI Num. difetti (cardVisual Min(IW67.Km.)) ================= */}
-      <PbiText x={491.92932426425244} y={70.33566433566455} w={117} h={28} z={27000}
-        text="Num. difetti" sizePt={12} color={PBI_COLORS.textLight} />
-      <PbiBox x={488.46153846153845} y={80} w={151.53846153846155} h={59.230769230769226} z={26000}
+      {/* ================= KPI Num. difetti (conteggio difetti) ================= */}
+      <PbiText x={490} y={70} w={150} h={22} z={27000}
+        text="Num. difetti" sizePt={11} color={PBI_COLORS.textLight} align="center" />
+      <PbiBox x={490} y={88} w={150} h={55} z={26000}
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontSize: fontSizePx(35), color: TEAL, lineHeight: 1 }}>
-          {minKm.toLocaleString('it-IT')}
+          {filtered.length.toLocaleString('it-IT')}
         </span>
       </PbiBox>
 

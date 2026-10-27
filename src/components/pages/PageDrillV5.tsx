@@ -8,6 +8,7 @@ import {
   PbiShape,
   PbiText,
   PbiButton,
+  PbiBackButton,
   PbiListSlicer,
   PBI_COLORS,
   fontSizePx,
@@ -301,36 +302,57 @@ export const PageDrillV5: React.FC<PageDrillV5Props> = ({
           text="PdM non visibile in ZSTMAIA" color={RED} background={BAND} />
       )}
 
-      {/* ================= Intestazione ================= */}
-      <PbiText x={7.2544080604534} y={92.49370277078086} w={339.14357682619647} h={27.20403022670025} z={7000}
-        text="Difetti di binario - DOIT VE" sizePt={20} bold color={RED} background={CANVAS} />
-      <PbiText x={305.59193954659946} y={95.21410579345087} w={79.02608695652174} h={25.6} z={37000}
-        text="Drill V5" sizePt={15} bold color={TEXT_LIGHT} background={CANVAS} />
-      <PbiBox x={39.8992443324937} y={11.788413098236775} w={249.37027707808562} h={74.35768261964735} z={33000}>
+      {/* ================= Bottoni e Navigazione ================= */}
+      <PbiBackButton x={15} y={14} size={32} onClick={onBack} />
+
+      <PbiBox x={55} y={8} w={95} h={42} z={33000}>
         <img src="/assets/logo_ufficiale.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }} />
       </PbiBox>
-      <PbiText x={385.7637221857338} y={92.88026964410722} w={118} h={28} z={34000}
-        text="Dati aggiornati al:" sizePt={11} color={MUTED} align="right" vAlign="middle" background={CANVAS} />
-      <PbiText x={493.7637221857336} y={93.88026964410722} w={131} h={27} z={13000}
-        text={dataAggiornamento} sizePt={12} color={TEXT_LIGHT} vAlign="middle" background={CANVAS} />
 
-      {/* ================= Bottoni ================= */}
-      <PbiBox x={0} y={0} w={99.74811083123424} h={39.8992443324937} z={38000} onClick={onBack} title="Indietro"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: PBI_COLORS.button, border: `1px solid ${MUTED}`, borderRadius: 18, cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.5)' }}>
-        <ArrowLeft size={18} color={MUTED} />
-      </PbiBox>
-      <PbiButton x={174.1057934508816} y={5.44080604534005} w={122.72727272727272} h={40} z={44000}
+      <PbiButton x={158} y={12} w={88} h={34} z={44000}
         label="Reset Filtri" sizePt={9} onClick={handleResetFilters} />
 
-      {/* ================= Slicer ================= */}
-      <PbiListSlicer x={305.9121106113611} y={11.130434782608685} w={143.58260869565217} h={67.89565217391305} z={36000}
+      {/* ================= Slicer Superiori ================= */}
+      <PbiListSlicer x={255} y={8} w={115} h={60} z={36000}
         title="Cerca Avviso" options={avvisiList} value={selAvviso} onToggle={toggleAvviso}
-        searchable itemColor={TEXT_LIGHT} itemSizePt={10}
-        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={12} />
-      <PbiListSlicer x={477.32096723931954} y={11.130434782608685} w={129.11304347826086} h={72.34782608695652} z={42000}
+        searchable itemColor={TEXT_LIGHT} itemSizePt={9}
+        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={10} />
+      <PbiListSlicer x={378} y={8} w={115} h={60} z={42000}
         title="Cerca PdM" options={pdmOptions} value={currentItem ? [currentItem.pdm] : []} onToggle={(v) => setCurrentPdmId(v)}
-        searchable itemColor={TEXT_LIGHT} itemSizePt={10}
-        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={12} />
+        searchable itemColor={TEXT_LIGHT} itemSizePt={9}
+        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={10} />
+
+      {/* ================= Card Posizione (Linea / Località / Tratta) ================= */}
+      <PbiDataTable x={500} y={8} w={220} h={60} z={47000}
+        columns={[
+          { label: 'Linea InRete', value: currentItem.linea },
+          { label: 'Località/Tratta', value: currentItem.localita_tratta },
+        ]}
+        widths={[110, 110]}
+        headerBackground={HEADER} headerColor={WHITE} headerSizePt={9}
+        rowBackground={CANVAS} rowColor={WHITE} rowSizePt={9}
+        borderColor={MUTED} />
+
+      {/* ================= Card Classificazione / Stato scadenza ================= */}
+      <PbiDataTable x={728} y={8} w={270} h={60} z={32000}
+        columns={[
+          { label: 'Classificazione', value: currentItem.classificazione_stato, color: classificazioneColor(currentItem.classificazione_stato) },
+          { label: 'Stato scadenza', value: currentItem.scadenza, color: scadenzaColor(currentItem.scadenza) },
+        ]}
+        widths={[150, 120]}
+        headerBackground={HEADER} headerColor={WHITE} headerSizePt={9}
+        rowBackground={CANVAS} rowColor={WHITE} rowSizePt={9}
+        borderColor={PURPLE} />
+
+      {/* ================= Riferimento temporale e Titoli (riga y=74) ================= */}
+      <PbiText x={15} y={72} w={230} h={26} z={7000}
+        text="Difetti di binario - DOIT VE" sizePt={16} bold color={RED} background={CANVAS} />
+      <PbiText x={250} y={72} w={80} h={26} z={37000}
+        text="Drill V5" sizePt={15} bold color={TEXT_LIGHT} background={CANVAS} />
+      <PbiText x={335} y={74} w={110} h={22} z={34000}
+        text="Dati aggiornati al:" sizePt={10} color={MUTED} align="right" vAlign="middle" background={CANVAS} />
+      <PbiText x={450} y={74} w={130} h={22} z={13000}
+        text={dataAggiornamento} sizePt={11} color={TEXT_LIGHT} vAlign="middle" background={CANVAS} />
 
       {/* ================= Etichette sezioni ================= */}
       <PbiText x={23.57682619647355} y={117.88413098236775} w={150.52896725440806} h={30.83123425692695} z={30000}
@@ -341,29 +363,6 @@ export const PageDrillV5: React.FC<PageDrillV5Props> = ({
         text="Stato PdM" sizePt={11} bold color={TEXT_LIGHT} />
       <PbiText x={1113.5516372777283} y={417.9420654913001} w={166} h={31} z={29000}
         text="Stato avviso" sizePt={11} bold color={TEXT_LIGHT} />
-
-      {/* ================= Card Posizione (Linea / Località / Tratta) ================= */}
-      <PbiDataTable x={632.0403022670025} y={14.5088161209068} w={257.5314861460957} h={93.40050377833752} z={47000}
-        columns={[
-          { label: 'Linea InRete', value: currentItem.linea },
-          { label: 'Località/Tratta', value: currentItem.localita_tratta },
-          { label: 'Tratta', value: currentItem.localita_tratta },
-        ]}
-        widths={[90.57170808220056, 93, 130, 111, 0]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={CANVAS} rowColor={WHITE} rowSizePt={10}
-        borderColor={MUTED} />
-
-      {/* ================= Card Classificazione / Stato scadenza ================= */}
-      <PbiDataTable x={911.3350125944584} y={14.5088161209068} w={352.74559193954656} h={64.38287153652392} z={32000}
-        columns={[
-          { label: 'Classificazione stato', value: currentItem.classificazione_stato, color: classificazioneColor(currentItem.classificazione_stato) },
-          { label: 'Stato scadenza', value: currentItem.scadenza, color: scadenzaColor(currentItem.scadenza) },
-        ]}
-        widths={[90.57170808220056, 93, 235, 99]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={CANVAS} rowColor={WHITE} rowSizePt={10}
-        borderColor={PURPLE} />
 
       {/* ================= Dati PdM: Punto di Misura ================= */}
       <PbiDataTable x={19} y={151} w={1053} h={65} z={14000}

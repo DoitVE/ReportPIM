@@ -44,18 +44,18 @@ interface AbbacoColumn {
  * `defaultColumnWidth: 90`).
  */
 const TABLE_COLUMNS: AbbacoColumn[] = [
-  { key: 'linea', label: 'Linea', width: 128.3242951027215, value: (r) => r.linea },
-  { key: 'tratta', label: 'Tratta', width: 172.4336040456551, value: (r) => r.tratta },
-  { key: 'chiave_rl', label: 'chiave_RL', width: 159.2904169714704, value: (r) => r.chiave_rl },
-  { key: 'rid_vel', label: 'Rid. Vel. (km/h)', width: 67.52743233357717, value: (r) => r.rid_vel },
-  { key: 'binario', label: 'Binario (P/D/L)', width: 90, value: (r) => r.binario },
-  { key: 'inizio', label: 'Inizio', width: 57.22750548646671, value: (r) => r.km_inizio },
-  { key: 'fine', label: 'Fine', width: 62.84564740307242, value: (r) => r.km_fine },
-  { key: 'motivo', label: 'Motivo', width: 167.6248607916895, value: (r) => r.motivo },
-  { key: 'data_inizio', label: 'Data inizio', width: 67.52740379303293, value: (r) => r.data_inizio ?? '' },
-  { key: 'titolare', label: 'Titolare del rallentamento (matr.)', width: 90, value: (r) => r.titolare },
-  { key: 'pianificazione', label: 'Pianificazione', width: 68.46378931967813, value: () => '' },
-  { key: 'data_fine', label: 'Data fine', width: 90, value: (r) => r.data_fine ?? '' },
+  { key: 'linea', label: 'Linea', width: 110, value: (r) => r.linea },
+  { key: 'tratta', label: 'Tratta', width: 155, value: (r) => r.tratta },
+  { key: 'chiave_rl', label: 'Chiave RL', width: 130, value: (r) => r.chiave_rl },
+  { key: 'rid_vel', label: 'Rid. Vel. (km/h)', width: 85, value: (r) => r.rid_vel },
+  { key: 'binario', label: 'Binario (P/D/L)', width: 95, value: (r) => r.binario },
+  { key: 'inizio', label: 'Inizio', width: 65, value: (r) => r.km_inizio },
+  { key: 'fine', label: 'Fine', width: 65, value: (r) => r.km_fine },
+  { key: 'motivo', label: 'Motivo', width: 150, value: (r) => r.motivo },
+  { key: 'data_inizio', label: 'Data inizio', width: 85, value: (r) => r.data_inizio ?? '' },
+  { key: 'titolare', label: 'Titolare del rallentamento', width: 115, value: (r) => r.titolare },
+  { key: 'pianificazione', label: 'Data pianificata', width: 90, value: () => '' },
+  { key: 'data_fine', label: 'Data fine', width: 85, value: (r) => r.data_fine ?? '' },
 ];
 
 const TABLE_WIDTH = TABLE_COLUMNS.reduce((sum, c) => sum + c.width, 0);
@@ -214,30 +214,30 @@ export const PageAbbaco: React.FC<PageAbbacoProps> = ({
         options={binariList} value={selectedBinari} onToggle={(v) => toggle(setSelectedBinari, v)} />
 
       {/* ================= Intestazione ================= */}
-      <PbiBox x={10} y={3.846153846153846} w={210} h={61.53846153846153} z={16000}>
+      <PbiBox x={10} y={4} w={200} h={58} z={16000}>
         <img
           src="/assets/logo_ufficiale.png"
           alt="RFI"
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiText x={233.07692307692307} y={3.846153846153846} w={343.8461538461538} h={27.69230769230769} z={14000}
-        text="Abbatimento Codici - DOIT VE" sizePt={20} bold color={RED} />
-      <PbiText x={233} y={35} w={84} h={25} z={18000}
+      <PbiText x={220} y={4} w={380} h={28} z={14000}
+        text="Abbattimento Codici - DOIT VE" sizePt={20} bold color={RED} />
+      <PbiText x={220} y={34} w={85} h={25} z={18000}
         text="ABBA.CO" sizePt={15} bold color={PBI_COLORS.textLight} background={PBI_COLORS.canvas} />
-      <PbiText x={335.7240205753123} y={33.188689916520104} w={70} h={27} z={17000}
-        text="Dati al:" sizePt={12} color={PBI_COLORS.textMuted} align="right" vAlign="middle" background={PBI_COLORS.canvas} padding={2} />
-      <PbiText x={397.6470974983892} y={34.26561299344317} w={130.76923076923077} h={26.923076923076923} z={15000}
-        text={dataAggiornamento} sizePt={12} color={PBI_COLORS.textLight} align="center" vAlign="middle" background={PBI_COLORS.canvas} padding={2} />
+      <PbiText x={315} y={33} w={55} h={26} z={17000}
+        text="Dati al:" sizePt={11} color={PBI_COLORS.textMuted} align="right" vAlign="middle" background={PBI_COLORS.canvas} />
+      <PbiText x={375} y={33} w={150} h={26} z={15000}
+        text={dataAggiornamento} sizePt={11} color={PBI_COLORS.textLight} vAlign="middle" background={PBI_COLORS.canvas} />
 
       {/* ================= Reset Filtri ================= */}
-      <PbiButton x={554} y={31} w={96.36363636363636} h={44.54545454545454} z={23000}
+      <PbiButton x={545} y={26} w={95} h={34} z={23000}
         label="Reset Filtri" onClick={handleResetFilters} />
 
       {/* ================= KPI Num. Rallentamenti ================= */}
-      <PbiText x={456.9422092172641} y={72.09948792977323} w={161.98975859546454} h={28.09070958302853} z={20000}
-        text="Num. Rallentamenti" sizePt={12} color={PBI_COLORS.textLight} />
-      <PbiBox x={457} y={82} w={181} h={59} z={19000} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <PbiText x={455} y={70} w={175} h={22} z={20000}
+        text="Num. Rallentamenti" sizePt={11} color={PBI_COLORS.textLight} align="center" />
+      <PbiBox x={455} y={88} w={175} h={55} z={19000} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontSize: fontSizePx(35), color: YELLOW, lineHeight: 1 }}>{filtered.length}</span>
       </PbiBox>
 

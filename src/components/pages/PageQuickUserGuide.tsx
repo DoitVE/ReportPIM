@@ -8,19 +8,19 @@ import {
 } from '../pbi/primitives';
 
 const PANEL_BG = '#3A3D44';
-const BTN_TEXT = '#D4D4D3';
+const BTN_TEXT = '#EAEAEA';
 
 export const PageQuickUserGuide: React.FC = () => {
   const pdfUrl = '/Quick_User_Guide.pdf';
 
   return (
     <PbiCanvas>
-      {/* z=1000: Title */}
+      {/* Title */}
       <PbiText
         x={377}
-        y={239}
-        w={525.04}
-        h={66.2}
+        y={230}
+        w={526}
+        h={70}
         z={1000}
         text="Quick User Guide"
         sizePt={44}
@@ -30,12 +30,12 @@ export const PageQuickUserGuide: React.FC = () => {
         vAlign="middle"
       />
 
-      {/* z=2001: Shape "Apri" (group child, absolute pos = group + relative) */}
+      {/* Button "Apri [PDF]" matching Power BI original screenshot */}
       <PbiBox
-        x={517.22}
-        y={352.22}
-        w={245.56}
-        h={93.33}
+        x={500}
+        y={350}
+        w={280}
+        h={90}
         z={2001}
       >
         <a
@@ -47,41 +47,74 @@ export const PageQuickUserGuide: React.FC = () => {
             width: '100%',
             height: '100%',
             background: PANEL_BG,
-            borderRadius: 22,
+            borderRadius: 24,
             alignItems: 'center',
-            justifyContent: 'flex-end',
-            paddingRight: 40,
+            justifyContent: 'center',
+            gap: 16,
             textDecoration: 'none',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+            boxShadow: '0 6px 16px rgba(0,0,0,0.4)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            transition: 'transform 0.15s ease, background 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#454852';
+            e.currentTarget.style.transform = 'scale(1.02)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = PANEL_BG;
+            e.currentTarget.style.transform = 'scale(1)';
           }}
         >
-          <span style={{ fontSize: fontSizePx(32), color: BTN_TEXT }}>
+          <span style={{ fontSize: fontSizePx(32), color: BTN_TEXT, fontWeight: 500 }}>
             Apri
           </span>
-        </a>
-      </PbiBox>
-
-      {/* z=2002: Image (Designer.png -> logo, group child, absolute pos) */}
-      <PbiBox
-        x={559.36}
-        y={375.08}
-        w={255.71}
-        h={50}
-        z={2002}
-      >
-        <a
-          href={pdfUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ display: 'block', width: '100%', height: '100%' }}
-        >
-          <img
-            src="/assets/logo_ufficiale.png"
-            alt="Quick User Guide"
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-          />
+          {/* Authentic red PDF document badge icon */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: '#D92D20',
+              borderRadius: 6,
+              width: 38,
+              height: 44,
+              boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Top document folded corner mark */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: 10,
+                height: 10,
+                background: 'rgba(255,255,255,0.4)',
+                borderBottomLeftRadius: 4,
+              }}
+            />
+            {/* Document lines */}
+            <div style={{ width: 18, height: 2, background: 'rgba(255,255,255,0.85)', marginBottom: 3 }} />
+            <div style={{ width: 14, height: 2, background: 'rgba(255,255,255,0.85)', marginBottom: 5 }} />
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 900,
+                color: '#FFFFFF',
+                letterSpacing: 0.5,
+                lineHeight: 1,
+              }}
+            >
+              PDF
+            </span>
+          </div>
         </a>
       </PbiBox>
     </PbiCanvas>
   );
 };
+
+export default PageQuickUserGuide;

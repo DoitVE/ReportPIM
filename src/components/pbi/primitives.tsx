@@ -201,7 +201,7 @@ export const PbiText: React.FC<PbiTextProps> = ({
           textAlign: align,
           lineHeight,
           width: '100%',
-          whiteSpace: 'pre-wrap',
+          whiteSpace: text.includes('\n') ? 'pre-wrap' : 'nowrap',
         }}
       >
         {text}

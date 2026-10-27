@@ -378,101 +378,105 @@ export const PageFrequenzaV3V4: React.FC<PageFrequenzaV3V4Props> = ({
   return (
     <PbiCanvas>
       {/* ================= Sfondi / pannelli ================= */}
-      <PbiShape x={138.69230769230484} y={140.76923076923077} w={236.9230769230769} h={86.15384615384615} z={0} fill={PBI_COLORS.card} radius={8} />
-      <PbiShape x={0} y={218.09749407804514} w={647.2609400324149} h={88.16855753646676} z={1000} fill={PBI_COLORS.card} radius={8} />
-      <PbiShape x={0} y={65.45454545454545} w={278.46153846153845} h={85.38461538461539} z={3000} fill={PBI_COLORS.card} radius={8} />
-      <PbiShape x={365.1215559157212} y={141.06969205834685} w={282.1393841166937} h={85.05672609400324} z={5000} fill={PBI_COLORS.card} radius={7} />
-      <PbiShape x={269.2307692307691} y={64.61538461538461} w={219.23076923076923} h={85.38461538461539} z={8000} fill={PBI_COLORS.card} radius={8} />
-      <PbiShape x={0} y={413} w={211} h={271} z={12000} fill={PBI_COLORS.card} radius={5} />
-      <PbiShape x={640} y={0} w={640} h={417.27272727272725} z={14000} fill="#000000" radius={2} />
-      <PbiShape x={480.7692307692308} y={64.61538461538461} w={168.46153846153845} h={85.38461538461539} z={16000} fill={PBI_COLORS.panel} radius={7} />
-      <PbiShape x={0} y={140.76923076923077} w={148.46153846153845} h={85.38461538461539} z={17000} fill={PBI_COLORS.card} radius={8} />
-      <PbiShape x={0.8695652173913044} y={296.5217391304348} w={371.304347826087} h={120.86956521739131} z={18000} fill={PBI_COLORS.panel} radius={5} />
-      <PbiShape x={363.9130434782609} y={296.5217391304348} w={284.34782608695656} h={120.86956521739131} z={37000} fill={PBI_COLORS.card} radius={7} />
-      <PbiShape x={201.8181818181818} y={411.8181818181818} w={1078.181818181818} h={271.8181818181818} z={31000} fill={PBI_COLORS.tableRowSecondary} radius={5} />
+      <PbiShape x={15} y={66} w={190} h={68} z={0} fill={PBI_COLORS.card} radius={6} />
+      <PbiShape x={215} y={66} w={140} h={68} z={0} fill={PBI_COLORS.card} radius={6} />
+      <PbiShape x={365} y={66} w={130} h={68} z={0} fill={PBI_COLORS.panel} radius={6} />
+
+      <PbiShape x={15} y={140} w={100} h={64} z={0} fill={PBI_COLORS.card} radius={6} />
+      <PbiShape x={122} y={140} w={180} h={64} z={0} fill={PBI_COLORS.card} radius={6} />
+      <PbiShape x={310} y={140} w={185} h={64} z={0} fill={PBI_COLORS.card} radius={6} />
+
+      <PbiShape x={15} y={210} w={480} h={64} z={0} fill={PBI_COLORS.card} radius={6} />
+      <PbiShape x={15} y={282} w={285} h={125} z={0} fill={PBI_COLORS.panel} radius={6} />
+      <PbiShape x={308} y={282} w={187} h={125} z={0} fill={PBI_COLORS.card} radius={6} />
 
       {/* ================= Intestazione ================= */}
-      <PbiBox x={10} y={4} w={200} h={58} z={26000}>
+      <PbiBox x={15} y={8} w={150} h={48} z={26000}>
         <img
           src="/assets/logo_ufficiale.png"
           alt="RFI"
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiText x={220} y={4} w={420} h={28} z={2000}
-        text="Difetti di livello e scartamento - DOIT VE" sizePt={20} bold color={ACCENT} />
-      <PbiText x={220} y={34} w={180} h={25} z={28000}
-        text="Frequenza V3 e V4" sizePt={15} bold color={PBI_COLORS.textLight} background={PBI_COLORS.canvas} />
-      <PbiText x={360} y={33} w={55} h={26} z={27000}
-        text="Dati al:" sizePt={11} color={PBI_COLORS.textMuted} align="right" vAlign="middle" background={PBI_COLORS.canvas} />
-      <PbiText x={420} y={33} w={130} h={26} z={25000}
-        text={dataAggiornamento} sizePt={11} color={PBI_COLORS.textLight} vAlign="middle" background={PBI_COLORS.canvas} />
+      <PbiText x={180} y={8} w={340} h={26} z={2000}
+        text="Difetti di livello e scartamento - DOIT VE" sizePt={16} bold color={ACCENT} />
+      <PbiText x={180} y={34} w={115} h={20} z={28000}
+        text="Frequenza V3 e V4" sizePt={12} bold color={PBI_COLORS.textLight} />
+      <PbiText x={298} y={35} w={45} h={18} z={27000}
+        text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
+      <PbiText x={345} y={35} w={100} h={18} z={25000}
+        text={dataAggiornamento} sizePt={9.5} color={PBI_COLORS.textLight} vAlign="middle" />
 
       {/* ================= Bottoni di navigazione ================= */}
-      <PbiButton x={550} y={26} w={95} h={34} z={33000} label="Reset Filtri" sizePt={9} onClick={handleResetFilters} />
-      <PbiButton x={1155} y={672} w={110} h={34} z={41000} variant="light"
+      <PbiButton x={450} y={32} w={65} h={24} z={33000} label="Reset Filtri" sizePt={8} onClick={handleResetFilters} />
+      <PbiButton x={1150} y={672} w={110} h={34} z={41000} variant="light"
         label="Drill V3 V4" sizePt={9} disabled={!selectedRow} onClick={() => selectedRow && onNavigateToDrill(selectedRow)} />
 
       {/* ================= Etichette dei filtri ================= */}
-      <PbiText x={16.153846153846153} y={84.61538461538461} w={245.3846153846154} h={16.923076923076923} z={11000}
-        text="  Anno avviso" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
-      <PbiText x={286.551208434105} y={82.73363000633466} w={183.09466344864578} h={18.18181818181818} z={15000}
-        text="  Trimestre" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
-      <PbiText x={155.67664263620264} y={159.2518080210388} w={199.56562343594783} h={18.188034188034187} z={9000}
-        text="  Unità Manutentiva" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
-      <PbiText x={17.692307692307693} y={161.53846153846152} w={111.53846153846153} h={17.692307692307693} z={21000}
-        text="   Divisione" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
-      <PbiText x={16} y={234} w={607} h={21} z={10000}
-        text="  Scadenza Avviso" sizePt={9} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
-      <PbiText x={17.826086956521742} y={311.304347826087} w={327.3913043478261} h={18.260869565217394} z={22000}
-        text="  Numero Difetti Binario" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
-      <PbiText x={381.0372771474879} y={157.1562149357935} w={250} h={18.46153846153846} z={34000}
-        text="  Tipo Avviso" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
-      <PbiText x={381.0372771474879} y={170.23313801271658} w={125.38461538461539} h={45.38461538461538} z={36000}
-        text={'V3 → Dif. livello\nV4 → Dif. scartamento'} sizePt={8} color={PBI_COLORS.textLight} />
-      <PbiText x={382.4275362318841} y={328.4057971014489} w={246.66666666666669} h={18.333333333333336} z={38000}
-        text="  Tipo Avviso" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
-      <PbiText x={382.0372066802904} y={341.34017768574836} w={125.38461538461539} h={45.38461538461538} z={40000}
-        text={'MISC → MISura Chiusa\nMIAP → MIsura Aperta'} sizePt={8} color={PBI_COLORS.textLight} />
+      <PbiText x={22} y={72} w={175} h={16} z={11000}
+        text="Anno avviso" sizePt={8} color={PBI_COLORS.textMuted} />
+      <PbiText x={222} y={72} w={125} h={16} z={15000}
+        text="Trimestre" sizePt={8} color={PBI_COLORS.textMuted} />
+      <PbiText x={22} y={144} w={85} h={16} z={21000}
+        text="Divisione" sizePt={8} color={PBI_COLORS.textMuted} />
+      <PbiText x={128} y={144} w={165} h={16} z={9000}
+        text="Unità Manutentiva" sizePt={8} color={PBI_COLORS.textMuted} />
+      <PbiText x={315} y={144} w={175} h={16} z={34000}
+        text="Tipo Avviso" sizePt={8} color={PBI_COLORS.textMuted} />
+      <PbiText x={22} y={214} w={465} h={16} z={10000}
+        text="Scadenza Avviso" sizePt={8.5} color={PBI_COLORS.textMuted} />
+      <PbiText x={22} y={288} w={270} h={16} z={22000}
+        text="Numero Difetti Binario" sizePt={8} color={PBI_COLORS.textMuted} />
+      <PbiText x={315} y={288} w={175} h={16} z={38000}
+        text="Tipo Avviso" sizePt={8} color={PBI_COLORS.textMuted} />
 
       {/* ================= Slicer a tile ================= */}
-      <PbiTileSlicer x={0.7692307692307692} y={107.76223776223776} w={274.6153846153846} h={26.153846153846153} z={7000}
+      <PbiTileSlicer x={20} y={94} w={180} h={28} z={7000}
         options={anniOptions} value={selAnni} onToggle={(v) => toggle(setSelAnni, v)} />
-      <PbiTileSlicer x={269.2307692307692} y={107.6923076923077} w={220} h={26.153846153846153} z={13000}
+      <PbiTileSlicer x={220} y={94} w={130} h={28} z={13000}
         options={TRIMESTRI} value={selTrimestri} onToggle={(v) => toggle(setSelTrimestri, v)} />
-      <PbiTileSlicer x={138.46153846153845} y={181.53846153846152} w={236.9230769230769} h={29.23076923076923} z={4000}
-        options={UNITA_MANUTENTIVE} value={selUm} onToggle={(v) => toggle(setSelUm, v)} />
-      <PbiTileSlicer x={0.7692307692307692} y={183.84615384615384} w={147.69230769230768} h={27.69230769230769} z={19000}
+      <PbiTileSlicer x={20} y={166} w={90} h={28} z={19000}
         options={DIVISIONI} value={selDivisioni} onToggle={(v) => toggle(setSelDivisioni, v)} />
-      <PbiTileSlicer x={0} y={260} w={647} h={27} z={6000}
-        options={SCADENZE} value={selScadenze} onToggle={(v) => toggle(setSelScadenze, v)} />
-      <PbiTileSlicer x={489.49881560902634} y={179.4639072434858} w={150} h={28.46153846153846} z={35000}
+      <PbiTileSlicer x={126} y={166} w={172} h={28} z={4000}
+        options={UNITA_MANUTENTIVE} value={selUm} onToggle={(v) => toggle(setSelUm, v)} />
+      <PbiTileSlicer x={415} y={166} w={75} h={28} z={35000}
         options={TIPI} value={selTipi} onToggle={(v) => toggle(setSelTipi, v)} />
-      <PbiTileSlicer x={489.2307692307692} y={350.7692307692308} w={160} h={28.46153846153846} z={39000}
+      <PbiTileSlicer x={20} y={236} w={470} h={28} z={6000}
+        options={SCADENZE} value={selScadenze} onToggle={(v) => toggle(setSelScadenze, v)} />
+      <PbiTileSlicer x={395} y={345} w={95} h={28} z={39000}
         options={STATI_MISURA} value={selStati} onToggle={(v) => toggle(setSelStati, v)} />
 
-      {/* ================= Slicer a elenco ================= */}
-      <PbiListSlicer x={10} y={425} w={181} h={244} z={24000}
-        title="Linea InRete" options={MASTER_LINEE_INRETE} value={selLinee}
-        onToggle={(v) => toggle(setSelLinee, v)} itemColor={PBI_COLORS.textLight} />
+      <PbiText x={314} y={162} w={98} h={34} z={36000}
+        text={'V3 → Dif. livello\nV4 → Dif. scartamento'} sizePt={7.5} color={PBI_COLORS.textLight} />
+      <PbiText x={314} y={335} w={80} h={34} z={40000}
+        text={'MISC → Chiusa\nMIAP → Aperta'} sizePt={7.5} color={PBI_COLORS.textLight} />
 
       {/* ================= KPI Num. difetti ================= */}
-      <PbiText x={491.92932426425244} y={70.33566433566455} w={117} h={28} z={30000}
-        text="Num. difetti" sizePt={9} color={PBI_COLORS.textLight} />
-      <PbiText x={488.46153846153845} y={80} w={151.53846153846155} h={59.230769230769226} z={29000}
-        text={formatCount(totalDifetti)} sizePt={35} color={BIN_GREEN} align="center" vAlign="middle" />
+      <PbiText x={365} y={72} w={130} h={18} z={30000}
+        text="Num. difetti" sizePt={9.5} color={PBI_COLORS.textLight} align="center" />
+      <PbiBox x={365} y={88} w={130} h={42} z={29000}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontSize: fontSizePx(30), fontWeight: 700, color: BIN_GREEN, lineHeight: 1 }}>
+          {formatCount(totalDifetti)}
+        </span>
+      </PbiBox>
 
       {/* ================= Grafico Numero Difetti Binario ================= */}
-      <BinBars x={18.260869565217394} y={316.5217391304348} w={337} h={96} z={23000}
+      <BinBars x={20} y={306} w={275} h={92} z={23000}
         data={binChartData} onSelect={(bin) => { const row = rowForBin(bin); if (row) onNavigateToDrill(row); }} />
 
       {/* ================= Mappa (azureMap) ================= */}
-      <PbiBox x={656.3636363636363} y={17.27272727272727} w={604.5454545454545} h={383.6363636363636} z={20000} style={{ overflow: 'hidden' }}>
+      <PbiBox x={505} y={10} w={760} h={398} z={20000} style={{ overflow: 'hidden', borderRadius: 4 }}>
         <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
       </PbiBox>
 
+      {/* ================= Slicer a elenco Linea InRete ================= */}
+      <PbiListSlicer x={15} y={415} w={175} h={290} z={24000}
+        title="Linea InRete" options={MASTER_LINEE_INRETE} value={selLinee}
+        onToggle={(v) => toggle(setSelLinee, v)} itemColor={PBI_COLORS.textLight} />
+
       {/* ================= Tabella (Punto di Misura) ================= */}
-      <PbiBox x={219.09090909090907} y={424.5454545454545} w={1046.3636363636363} h={243.63636363636363} z={32000}
+      <PbiBox x={200} y={415} w={1065} h={250} z={32000}
         style={{ border: `2px solid ${ACCENT}`, overflow: 'hidden', background: PBI_COLORS.tableRowSecondary }}>
         <div className="scrollbar-thin" style={{ width: '100%', height: '100%', overflow: 'auto' }}>
           <table style={{ borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', width: TABLE_WIDTH, fontSize: fontSizePx(8) }}>

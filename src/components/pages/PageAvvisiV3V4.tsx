@@ -327,107 +327,106 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
   return (
     <PbiCanvas>
       {/* ================= Pannelli / sfondi ================= */}
-      <PbiShape x={0} y={65.45454545454545} w={278.46153846153845} h={85.38461538461539} z={0} fill={PBI_COLORS.card} radius={8} />
-      <PbiShape x={0} y={212.96703296703296} w={649.2857142857143} h={92.85714285714286} z={0} fill={PBI_COLORS.card} radius={7} />
-      <PbiShape x={134.16666666666669} y={140.83333333333334} w={244.58333333333334} h={85.41666666666667} z={1000} fill={PBI_COLORS.card} radius={7} />
-      <PbiShape x={365.38461538461536} y={140.76923076923077} w={279.2307692307692} h={85.38461538461539} z={6000} fill={PBI_COLORS.card} radius={7} />
-      <PbiShape x={269.2307692307691} y={64.61538461538461} w={219.23076923076923} h={85.38461538461539} z={7000} fill={PBI_COLORS.card} radius={8} />
-      <PbiShape x={447} y={296} w={202} h={193} z={9000} fill={PBI_COLORS.card} radius={5} />
-      <PbiShape x={640} y={0} w={640} h={488.5575364667747} z={11000} fill="#000000" radius={2} />
-      <PbiShape x={480.7692307692308} y={64.61538461538461} w={168.46153846153845} h={85.38461538461539} z={13000} fill={PBI_COLORS.panel} radius={7} />
-      <PbiShape x={0} y={140.76923076923077} w={148.46153846153845} h={85.38461538461539} z={14000} fill={PBI_COLORS.card} radius={8} />
-      <PbiShape x={0.7692307692307692} y={296.15384615384613} w={456.15384615384613} h={193.07692307692307} z={15000} fill={PBI_COLORS.panel} radius={5} />
-      <PbiShape x={0} y={479.09090909090907} w={1280} h={240.90909090909088} z={28000} fill={PBI_COLORS.band} radius={5} />
+      <PbiShape x={15} y={66} w={190} h={68} z={0} fill={PBI_COLORS.card} radius={6} />
+      <PbiShape x={215} y={66} w={140} h={68} z={0} fill={PBI_COLORS.card} radius={6} />
+      <PbiShape x={365} y={66} w={130} h={68} z={0} fill={PBI_COLORS.panel} radius={6} />
+
+      <PbiShape x={15} y={140} w={100} h={64} z={0} fill={PBI_COLORS.card} radius={6} />
+      <PbiShape x={122} y={140} w={180} h={64} z={0} fill={PBI_COLORS.card} radius={6} />
+      <PbiShape x={310} y={140} w={185} h={64} z={0} fill={PBI_COLORS.card} radius={6} />
+
+      <PbiShape x={15} y={210} w={480} h={64} z={0} fill={PBI_COLORS.card} radius={6} />
+      <PbiShape x={15} y={282} w={335} h={190} z={0} fill={PBI_COLORS.panel} radius={6} />
+      <PbiShape x={358} y={282} w={137} h={190} z={0} fill={PBI_COLORS.card} radius={6} />
 
       {/* ================= Intestazione ================= */}
-      <PbiBox x={10} y={4} w={200} h={58} z={23000}>
+      <PbiBox x={15} y={8} w={150} h={48} z={23000}>
         <img
           src="/assets/logo_ufficiale.png"
           alt="RFI"
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiText x={220} y={4} w={420} h={28} z={2000}
-        text="Difetti di livello e scartamento - DOIT VE" sizePt={20} bold color={RED} />
-      <PbiText x={220} y={34} w={125} h={25} z={25000}
-        text="Avvisi V3 e V4" sizePt={15} bold color={PBI_COLORS.textLight} background={PBI_COLORS.canvas} />
-      <PbiText x={350} y={33} w={55} h={26} z={24000}
-        text="Dati al:" sizePt={11} color={PBI_COLORS.textMuted} align="right" vAlign="middle" background={PBI_COLORS.canvas} />
-      <PbiText x={410} y={33} w={130} h={26} z={22000}
-        text={dataAggiornamento} sizePt={11} color={PBI_COLORS.textLight} vAlign="middle" background={PBI_COLORS.canvas} />
-      <PbiButton x={550} y={26} w={95} h={34} z={30000}
-        label="Reset Filtri" sizePt={9} onClick={handleResetFilters} />
+      <PbiText x={180} y={8} w={340} h={26} z={2000}
+        text="Difetti di livello e scartamento - DOIT VE" sizePt={16} bold color={RED} />
+      <PbiText x={180} y={34} w={95} h={20} z={25000}
+        text="Avvisi V3 e V4" sizePt={12} bold color={PBI_COLORS.textLight} />
+      <PbiText x={278} y={35} w={45} h={18} z={24000}
+        text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
+      <PbiText x={325} y={35} w={100} h={18} z={22000}
+        text={dataAggiornamento} sizePt={9.5} color={PBI_COLORS.textLight} vAlign="middle" />
+      <PbiButton x={430} y={32} w={65} h={24} z={30000}
+        label="Reset Filtri" sizePt={8} onClick={handleResetFilters} />
 
       {/* ================= Etichette dei filtri ================= */}
-      <PbiText x={16.153846153846153} y={83.91608391608392} w={245.3846153846154} h={17.692307692307693} z={2000}
-        text="Anno avviso" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.canvas} />
-      <PbiText x={286.551208434105} y={82.73363000633466} w={183.09466344864578} h={18.18181818181818} z={12000}
-        text="Trimestre" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.canvas} />
-      <PbiText x={155.67664263620264} y={159.2518080210388} w={199.56562343594783} h={17} z={8000}
-        text="Unità Manutentiva" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.canvas} />
-      <PbiText x={17.619047619047617} y={159.04761904761904} w={111.42857142857143} h={17.142857142857142} z={18000}
-        text="Divisione" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.canvas} />
-      <PbiText x={380} y={159.04761904761904} w={250} h={17.142857142857142} z={31000}
-        text="Tipo Avviso" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.canvas} />
-      <PbiText x={16.42857142857143} y={232.99058084772372} w={613.5714285714286} h={22.142857142857146} z={5000}
-        text="Scadenza Avviso" sizePt={9} color={PBI_COLORS.textMuted} background={PBI_COLORS.canvas} />
-      <PbiText x={17.692307692307693} y={316.15384615384613} w={416.9230769230769} h={20} z={19000}
-        text="Numero Difetti" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.canvas} />
+      <PbiText x={22} y={72} w={175} h={16} z={2000}
+        text="Anno avviso" sizePt={8} color={PBI_COLORS.textMuted} />
+      <PbiText x={222} y={72} w={125} h={16} z={12000}
+        text="Trimestre" sizePt={8} color={PBI_COLORS.textMuted} />
+      <PbiText x={22} y={144} w={85} h={16} z={18000}
+        text="Divisione" sizePt={8} color={PBI_COLORS.textMuted} />
+      <PbiText x={128} y={144} w={165} h={16} z={8000}
+        text="Unità Manutentiva" sizePt={8} color={PBI_COLORS.textMuted} />
+      <PbiText x={315} y={144} w={175} h={16} z={31000}
+        text="Tipo Avviso" sizePt={8} color={PBI_COLORS.textMuted} />
+      <PbiText x={22} y={214} w={465} h={16} z={5000}
+        text="Scadenza Avviso" sizePt={8.5} color={PBI_COLORS.textMuted} />
+      <PbiText x={22} y={288} w={320} h={16} z={19000}
+        text="Numero Difetti" sizePt={8} color={PBI_COLORS.textMuted} />
 
       {/* ================= Slicer a tile ================= */}
-      <PbiTileSlicer x={0.7692307692307692} y={107.76223776223776} w={274.6153846153846} h={26.153846153846153} z={1000}
+      <PbiTileSlicer x={20} y={94} w={180} h={28} z={1000}
         options={anniOptions} value={selectedAnni} onToggle={(v) => toggle(setSelectedAnni, v)} />
-      <PbiTileSlicer x={269.04761904761904} y={107.61904761904762} w={219.52380952380952} h={26.666666666666664} z={10000}
+      <PbiTileSlicer x={220} y={94} w={130} h={28} z={10000}
         options={TRIMESTRI} value={selectedTrimestri} onToggle={(v) => toggle(setSelectedTrimestri, v)} />
-      <PbiTileSlicer x={1.1764705882352942} y={181.76470588235296} w={140.58823529411765} h={28.235294117647058} z={16000}
+      <PbiTileSlicer x={20} y={166} w={90} h={28} z={16000}
         options={DIVISIONI} value={selectedDivisioni} onToggle={(v) => toggle(setSelectedDivisioni, v)} />
-      <PbiTileSlicer x={138.69233425867515} y={181.74753451676528} w={233.53424019100274} h={28.717948717948715} z={4000}
+      <PbiTileSlicer x={126} y={166} w={172} h={28} z={4000}
         options={UNITA_MANUTENTIVE} value={selectedUM} onToggle={(v) => toggle(setSelectedUM, v)} />
-      <PbiTileSlicer x={488.46153846153845} y={181.53846153846152} w={150} h={28.46153846153846} z={32000}
+      <PbiTileSlicer x={415} y={166} w={75} h={28} z={32000}
         options={TIPI} value={selectedTipi} onToggle={(v) => toggle(setSelectedTipi, v)} />
-      <PbiTileSlicer x={0} y={259} w={649} h={28} z={3000}
+      <PbiTileSlicer x={20} y={236} w={470} h={28} z={3000}
         options={STATI_SCADENZA} value={selectedStati} onToggle={(v) => toggle(setSelectedStati, v)} />
-      <PbiText x={380} y={172.3076923076923} w={125.38461538461539} h={45.38461538461538} z={33000}
-        text={'V3 → Dif. livello\nV4 → Dif. scartamento'} sizePt={8} color={PBI_COLORS.textLight} />
+      <PbiText x={314} y={162} w={98} h={34} z={33000}
+        text={'V3 → Dif. livello\nV4 → Dif. scartamento'} sizePt={7.5} color={PBI_COLORS.textLight} />
 
       {/* ================= KPI Num. difetti (conteggio difetti) ================= */}
-      <PbiText x={490} y={70} w={150} h={22} z={27000}
-        text="Num. difetti" sizePt={11} color={PBI_COLORS.textLight} align="center" />
-      <PbiBox x={490} y={88} w={150} h={55} z={26000}
+      <PbiText x={365} y={72} w={130} h={18} z={27000}
+        text="Num. difetti" sizePt={9.5} color={PBI_COLORS.textLight} align="center" />
+      <PbiBox x={365} y={88} w={130} h={42} z={26000}
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontSize: fontSizePx(35), color: TEAL, lineHeight: 1 }}>
+        <span style={{ fontSize: fontSizePx(30), fontWeight: 700, color: TEAL, lineHeight: 1 }}>
           {filtered.length.toLocaleString('it-IT')}
         </span>
       </PbiBox>
 
       {/* ================= Bar chart IW67.Stato ================= */}
-      <PbiBox x={17.692307692307693} y={323.07692307692304} w={423.8461538461538} h={158.46153846153845} z={20000}
-        style={{ overflow: 'hidden' }}>
+      <PbiBox x={20} y={306} w={325} h={160} z={20000} style={{ overflow: 'hidden' }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart layout="vertical" data={barData} margin={{ top: 5, right: 30, left: 0, bottom: 0 }}>
+          <BarChart layout="vertical" data={barData} margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
             <XAxis type="number" hide />
-            <YAxis type="category" dataKey="name" width={90} tickLine={false} axisLine={false}
-              interval={0} tick={{ fill: PBI_COLORS.textLight, fontSize: 11 }} />
-            <Bar dataKey="count" fill={TEAL} isAnimationActive={false} barSize={14}>
-              <LabelList dataKey="count" position="right" fill={PBI_COLORS.textLight} fontSize={fontSizePx(12)} />
+            <YAxis type="category" dataKey="name" width={85} tickLine={false} axisLine={false}
+              interval={0} tick={{ fill: PBI_COLORS.textLight, fontSize: 10 }} />
+            <Bar dataKey="count" fill={TEAL} isAnimationActive={false} barSize={12} radius={[0, 2, 2, 0]}>
+              <LabelList dataKey="count" position="right" fill={PBI_COLORS.textLight} fontSize={fontSizePx(9.5)} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </PbiBox>
 
       {/* ================= Slicer a elenco Linea InRete ================= */}
-      <PbiListSlicer x={457.27272727272725} y={310.9090909090909} w={182.72727272727272} h={162.72727272727272} z={21000}
+      <PbiListSlicer x={358} y={282} w={137} h={190} z={21000}
         title="Linea InRete" options={MASTER_LINEE_INRETE} value={selectedLinee}
         onToggle={(v) => toggle(setSelectedLinee, v)} itemColor={PBI_COLORS.textLight} itemSizePt={8} />
 
       {/* ================= Mappa bubble ================= */}
-      <PbiBox x={656.5964343598055} y={17.633711507293356} w={604.7325769854133} h={456.40194489465154} z={17000}
-        style={{ overflow: 'hidden' }}>
+      <PbiBox x={505} y={10} w={760} h={462} z={17000}
+        style={{ overflow: 'hidden', borderRadius: 4 }}>
         <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
       </PbiBox>
 
       {/* ================= Tabella (17 colonne) ================= */}
-      <PbiBox x={14.545454545454545} y={491.81818181818176} w={1250.9090909090908} h={214.54545454545453} z={29000}
+      <PbiBox x={15} y={482} w={1250} h={228} z={29000}
         style={{ border: `2px solid ${RED}`, overflow: 'hidden', background: PBI_COLORS.band }}>
         <div className="scrollbar-thin" style={{ width: '100%', height: '100%', overflow: 'auto' }}>
           <table style={{ borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', width: TABLE_WIDTH, fontSize: fontSizePx(8) }}>

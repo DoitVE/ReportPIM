@@ -59,6 +59,7 @@ export const App: React.FC = () => {
     setControlli(initialControlli as unknown as ControlloAvvisoItem[]);
     setOdl(initialOdl as unknown as OdlItem[]);
     setSelectedPdmItem(initialPdmV5List[0]);
+    setDataAggiornamento('20/10/2026 15:47');
   };
 
   // Reset all datasets to empty

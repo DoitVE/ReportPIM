@@ -1,11 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
 import { PdmV5Item, AvvisoV5Detail } from '../../types';
 import { initialAvvisiV5Details, initialPdmV5List } from '../../data/v5Dataset';
 import {
   PbiCanvas,
   PbiBox,
-  PbiShape,
   PbiText,
   PbiButton,
   PbiBackButton,
@@ -21,7 +19,7 @@ interface PageDrillV5Props {
   onBack: () => void;
 }
 
-/* -------------------- Palette (dai visual.json PBIR) -------------------- */
+/* -------------------- Palette -------------------- */
 const RED = PBI_COLORS.accent; // #F26D6D
 const GREEN = PBI_COLORS.good; // #6CC070
 const AMBER = '#F5C26B';
@@ -30,7 +28,6 @@ const PURPLE = '#8A50D8';
 const PANEL = PBI_COLORS.panel; // #3A3D44
 const BAND = PBI_COLORS.band; // #2B2B2B
 const CANVAS = PBI_COLORS.canvas; // #1B1C1F
-const CARD = PBI_COLORS.card; // #2B2D31
 const HEADER = PBI_COLORS.tableHeader; // #000000
 const WHITE = '#FFFFFF';
 const TEXT_LIGHT = PBI_COLORS.textLight; // #E6E6E6
@@ -39,7 +36,6 @@ const SLICER_YELLOW = '#F5C26B';
 const HEADER_SLICER = PBI_COLORS.slicerHeader; // #1A1A1A
 
 /* -------------------- Conditional formatting -------------------- */
-/** Classificazione stato (tableEx 5e0ece156b20a8dd86a6). */
 const classificazioneColor = (v: string): string => {
   if (v === 'Pdm mancante - Avv. chiuso') return AMBER;
   if (v === 'Pdm mancante - Avv. aperto') return RED;
@@ -52,20 +48,17 @@ const classificazioneColor = (v: string): string => {
   return WHITE;
 };
 
-/** Stato scadenza (tableEx 5e0ece156b20a8dd86a6). */
 const scadenzaColor = (v: string): string => {
   if (v.includes('<60')) return AMBER;
   if (v.includes('<30')) return ORANGE;
   if (v.includes('SCADUT')) return RED;
   if (v.includes('MANCANTE')) return RED;
   if (v.includes('<10')) return RED;
+  if (v.includes('COMPLETATO')) return GREEN;
   return WHITE;
 };
 
-/** St.sist. / Stato avviso: MECO -> verde, altrimenti rosso. */
 const statoAvvisoColor = (v: string): string => (v.includes('MECO') ? GREEN : RED);
-
-/** Tolto d'opera: N -> rosso, S -> verde. */
 const toltoColor = (v: string): string => (v === 'S' ? GREEN : v === 'N' ? RED : WHITE);
 
 /* -------------------- Tabella generica -------------------- */
@@ -94,15 +87,10 @@ interface PbiDataTableProps {
   wordWrap?: boolean;
 }
 
-/**
- * Riproduce un `tableEx` con un singolo record: intestazioni e riga con le
- * larghezze di colonna (`columnWidth`) del PBIR, ridimensionate per riempire
- * il box del visual.
- */
 const PbiDataTable: React.FC<PbiDataTableProps> = ({
   x, y, w, h, z, columns, widths = [],
-  headerBackground = HEADER, headerColor = WHITE, headerSizePt = 10,
-  rowBackground = BAND, rowColor = WHITE, rowSizePt = 10,
+  headerBackground = HEADER, headerColor = WHITE, headerSizePt = 9,
+  rowBackground = BAND, rowColor = WHITE, rowSizePt = 9.5,
   borderColor = RED, wordWrap = false,
 }) => {
   const n = columns.length;
@@ -119,27 +107,28 @@ const PbiDataTable: React.FC<PbiDataTableProps> = ({
 
   return (
     <PbiBox x={x} y={y} w={w} h={h} z={z}
-      style={{ overflow: 'hidden', border: `1px solid ${borderColor}`, background: rowBackground }}>
-      <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: '100%', fontSize: fontSizePx(rowSizePt) }}>
+      style={{ overflow: 'hidden', border: `1.5px solid ${borderColor}`, borderRadius: 3, background: rowBackground }}>
+      <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: '100%', height: '100%', fontSize: fontSizePx(rowSizePt) }}>
         <colgroup>
           {colW.map((cw, i) => <col key={i} style={{ width: cw }} />)}
         </colgroup>
         <thead>
-          <tr>
+          <tr style={{ height: 22 }}>
             {columns.map((c, i) => (
               <th
                 key={i}
                 style={{
                   background: headerBackground,
                   color: headerColor,
-                  fontWeight: 400,
+                  fontWeight: 500,
                   textAlign: 'left',
-                  padding: '2px 4px',
+                  padding: '3px 6px',
                   fontSize: fontSizePx(headerSizePt),
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   borderRight: `1px solid ${borderColor}`,
+                  borderBottom: `1px solid ${borderColor}`,
                 }}
               >
                 {c.label}
@@ -154,15 +143,17 @@ const PbiDataTable: React.FC<PbiDataTableProps> = ({
                 key={i}
                 title={c.value}
                 style={{
-                  padding: '2px 4px',
+                  padding: '4px 6px',
                   color: c.color ?? rowColor,
                   verticalAlign: 'top',
                   whiteSpace: wordWrap ? 'pre-wrap' : 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
+                  borderRight: `1px solid ${borderColor}`,
+                  fontSize: fontSizePx(rowSizePt),
                 }}
               >
-                {c.value}
+                {c.value || '-'}
               </td>
             ))}
           </tr>
@@ -172,394 +163,336 @@ const PbiDataTable: React.FC<PbiDataTableProps> = ({
   );
 };
 
-/* -------------------- Indicatore (flag / anomalia) -------------------- */
-interface PbiFlagProps {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  z: number;
-  text: string;
-  color: string;
-  background: string;
-}
-
-/** Riproduce i `tableEx` di flag: icona `CircleSymbolMedium` + testo. */
-const PbiFlag: React.FC<PbiFlagProps> = ({ x, y, w, h, z, text, color, background }) => (
-  <PbiBox x={x} y={y} w={w} h={h} z={z}
-    style={{ background, display: 'flex', alignItems: 'center', gap: 4, padding: '2px 4px', overflow: 'hidden' }}>
-    <span style={{ color, fontSize: fontSizePx(10), lineHeight: 1 }}>{'\u25CF'}</span>
-    <span style={{ color, fontSize: fontSizePx(10), whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{text}</span>
-  </PbiBox>
-);
-
 /* -------------------- Pagina -------------------- */
 export const PageDrillV5: React.FC<PageDrillV5Props> = ({
-  selectedItem: initialSelectedItem,
+  selectedItem,
   pdmList,
   dataAggiornamento,
   onBack,
 }) => {
-  const [currentPdmId, setCurrentPdmId] = useState<string>(
-    initialSelectedItem?.pdm || '1208502'
-  );
-  const [searchPdmInput, setSearchPdmInput] = useState('');
-  const [searchAvvisoInput, setSearchAvvisoInput] = useState('');
+  const currentList = pdmList.length > 0 ? pdmList : initialPdmV5List;
+  const [currentPdmId, setCurrentPdmId] = useState<string>(selectedItem?.pdm || currentList[0]?.pdm || '');
   const [selAvviso, setSelAvviso] = useState<string[]>([]);
 
-  // Fallback ai dati demo quando la web app non è alimentata
-  const effectiveList = useMemo(
-    () => (pdmList && pdmList.length ? pdmList : initialPdmV5List),
-    [pdmList]
-  );
+  const currentItem = useMemo(() => {
+    return currentList.find((p) => p.pdm === currentPdmId) || selectedItem || currentList[0] || {} as PdmV5Item;
+  }, [currentList, currentPdmId, selectedItem]);
 
-  const currentItem: PdmV5Item = useMemo(
-    () =>
-      effectiveList.find((p) => p.pdm === currentPdmId) ||
-      initialSelectedItem ||
-      effectiveList[0],
-    [effectiveList, currentPdmId, initialSelectedItem]
-  );
+  const avvisoDetail = useMemo((): AvvisoV5Detail => {
+    const fromStatic = initialAvvisiV5Details.find((a) => a.pdm === currentItem.pdm || a.avviso === currentItem.avviso);
+    if (fromStatic) return fromStatic;
 
-  const avvisoDetail: AvvisoV5Detail = useMemo(() => {
-    const linked = initialAvvisiV5Details.find(
-      (a) => a.pdm === currentItem?.pdm || (currentItem?.avviso && a.avviso === currentItem.avviso)
-    );
-    if (linked) return linked;
-    return initialAvvisiV5Details[0];
+    return {
+      avviso: currentItem.avviso || '-',
+      pdm: currentItem.pdm,
+      tipo: 'V5',
+      descrizione: currentItem.osservazioni || 'Dettaglio difetto armamento',
+      autore: currentItem.creato_da || '941235',
+      data_creazione: currentItem.data_creaz_avviso || currentItem.data_creazione || '-',
+      ultima_mod: currentItem.creato_da || '946194',
+      data_modifica: currentItem.data_tolto_dop || currentItem.data_creazione || '-',
+      sede_tecnica: currentItem.sede_tecnica || '-',
+      ordine: currentItem.ordine || '-',
+      network: currentItem.network || '-',
+      testo_esteso: currentItem.testo_esteso || currentItem.osservazioni || '-',
+      stato_sistema: currentItem.stato_avviso || 'MAPE',
+      inizio_richiesta: currentItem.inizio_richiesta || currentItem.data_creazione || '-',
+      fine_richiesta: currentItem.fine_richiesta || '-',
+      data_chiusura: currentItem.data_chiusura || '-',
+      ritardo_avv: currentItem.ritardo_avv || '',
+    };
   }, [currentItem]);
 
-  // Opzioni degli slicer (uniche, filtrate dal testo di ricerca)
   const avvisiList = useMemo(() => {
     const set = new Set<string>();
-    effectiveList.forEach((p) => { if (p.avviso) set.add(p.avviso); });
-    const all = Array.from(set).sort();
-    return searchAvvisoInput
-      ? all.filter((a) => a.toLowerCase().includes(searchAvvisoInput.toLowerCase()))
-      : all;
-  }, [effectiveList, searchAvvisoInput]);
+    currentList.forEach((p) => { if (p.avviso) set.add(p.avviso); });
+    return Array.from(set).sort();
+  }, [currentList]);
 
   const pdmOptions = useMemo(() => {
-    const all = effectiveList.map((p) => p.pdm).sort();
-    return searchPdmInput
-      ? all.filter((p) => p.toLowerCase().includes(searchPdmInput.toLowerCase()))
-      : all;
-  }, [effectiveList, searchPdmInput]);
+    return currentList.map((p) => p.pdm).filter(Boolean);
+  }, [currentList]);
 
   const handleResetFilters = () => {
-    setCurrentPdmId(initialSelectedItem?.pdm || '1208502');
-    setSearchPdmInput('');
-    setSearchAvvisoInput('');
     setSelAvviso([]);
+    if (currentList[0]) setCurrentPdmId(currentList[0].pdm);
   };
 
-  const toggleAvviso = (value: string) => {
-    setSelAvviso((prev) => (prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]));
+  const toggleAvviso = (avviso: string) => {
+    setSelAvviso((prev) => {
+      const next = prev.includes(avviso) ? [] : [avviso];
+      if (next.length > 0) {
+        const found = currentList.find((p) => p.avviso === avviso);
+        if (found) setCurrentPdmId(found.pdm);
+      }
+      return next;
+    });
   };
-
-  // Flag di anomalia (sovrappongono il canvas solo quando attivi)
-  const flagToltoFuturo = !!currentItem.tolto_data_futura;
-  const flagToltoMinoreScoperta = !!currentItem.data_tolto_minore_scoperta;
-  const flagChiusuraFutura = !!currentItem.avviso_chiusura_futura || !!avvisoDetail.chiusura_futura;
-  const flagChiusuraAntecedente =
-    !!currentItem.avviso_chiusura_antec_inizio || !!avvisoDetail.chiusura_minore_inizio;
-  const flagNonVisibile = !!currentItem.non_visibile_zstmaia;
-
-  const chiusuraRitardo = !!avvisoDetail.ritardo_avv || !!currentItem.avviso_chiusura_ritardo;
-  const consuntivazioneAnomala = currentItem.network_odl === 'N';
 
   return (
     <PbiCanvas>
-      {/* ================= Sfondi / pannelli ================= */}
-      <PbiShape x={1096} y={138} w={184} h={275} z={1000} fill={PANEL} radius={8} />
-      <PbiShape x={1095.5555555555554} y={436.6666666666667} w={184.44444444444443} h={283.3333333333333} z={2000} fill={PANEL} radius={8} />
-      <PbiShape x={290.3295019157089} y={0} w={178.08695652173913} h={93.49565217391304} z={8000} fill={CARD} radius={8} />
-      <PbiShape x={892.2921914357682} y={0} w={386.29722921914356} h={126.04534005037783} z={9000} fill={CANVAS} radius={8} />
-      <PbiShape x={0} y={138.06020066889633} w={1103.4113712374583} h={275.05016722408027} z={11000} fill={BAND} radius={5} />
-      <PbiShape x={0} y={436.6666666666667} w={1103.3333333333333} h={283.3333333333333} z={12000} fill={BAND} radius={5} />
-      <PbiShape x={461.73835854366735} y={0} w={163.61739130434782} h={94.6086956521739} z={41000} fill={CARD} radius={8} />
-      <PbiShape x={616.624685138539} y={0} w={285.6423173803526} h={126.04534005037783} z={46000} fill={CANVAS} radius={8} />
+      {/* ================= Barra Superiore (y=8 a 105) ================= */}
+      {/* Pulsante Indietro nativo Power BI */}
+      <PbiBackButton x={15} y={14} size={32} onClick={onBack} title="Torna alla pagina precedente" />
 
-      {/* ================= Indicatori (flag / anomalie) ================= */}
-      {flagToltoFuturo && (
-        <PbiFlag x={640.2015113350126} y={96.12090680100755} w={192.2418136020151} h={58.942065491183875} z={0}
-          text="Data Tolto d'opera futura" color={RED} background={CANVAS} />
-      )}
-      {flagToltoMinoreScoperta && (
-        <PbiFlag x={832.3984719098727} y={95.81805376593658} w={260.58631921824104} h={59.413680781758956} z={4000}
-          text="Data Tolto d'opera < Data scoperta" color={RED} background={CANVAS} />
-      )}
-      {flagChiusuraFutura && (
-        <PbiFlag x={515.7739557739558} y={389.97542997543} w={261.031941031941} h={59.75429975429976} z={5000}
-          text="Data chiusura avv. futura" color={RED} background={CANVAS} />
-      )}
-      {flagChiusuraAntecedente && (
-        <PbiFlag x={824.4951140065147} y={390.8794788273616} w={260.58631921824104} h={59.413680781758956} z={6000}
-          text="Data chiusura avv. < Data inizio avv." color={RED} background={CANVAS} />
-      )}
-      {flagNonVisibile && (
-        <PbiFlag x={869.2307692307692} y={346.9230769230769} w={215.3846153846154} h={55.38461538461538} z={43000}
-          text="PdM non visibile in ZSTMAIA" color={RED} background={BAND} />
-      )}
-
-      {/* ================= Bottoni e Navigazione ================= */}
-      <PbiBackButton x={15} y={14} size={32} onClick={onBack} />
-
-      <PbiBox x={55} y={8} w={95} h={42} z={33000}>
-        <img src="/assets/logo_ufficiale.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }} />
+      {/* Logo RFI */}
+      <PbiBox x={52} y={10} w={95} h={42} z={33000}>
+        <img
+          src="/assets/logo_ufficiale.png"
+          alt="RFI"
+          style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
+        />
       </PbiBox>
 
-      <PbiButton x={158} y={12} w={88} h={34} z={44000}
-        label="Reset Filtri" sizePt={9} onClick={handleResetFilters} />
+      {/* Reset Filtri */}
+      <PbiButton
+        x={152} y={12} w={82} h={30} z={44000}
+        label="Reset Filtri" sizePt={8.5} onClick={handleResetFilters}
+      />
 
-      {/* ================= Slicer Superiori ================= */}
-      <PbiListSlicer x={255} y={8} w={115} h={60} z={36000}
+      {/* Slicer Cerca Avviso */}
+      <PbiListSlicer
+        x={240} y={8} w={115} h={95} z={36000}
         title="Cerca Avviso" options={avvisiList} value={selAvviso} onToggle={toggleAvviso}
-        searchable itemColor={TEXT_LIGHT} itemSizePt={9}
-        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={10} />
-      <PbiListSlicer x={378} y={8} w={115} h={60} z={42000}
+        searchable itemColor={TEXT_LIGHT} itemSizePt={8}
+        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={9.5}
+      />
+
+      {/* Slicer Cerca PdM */}
+      <PbiListSlicer
+        x={362} y={8} w={115} h={95} z={42000}
         title="Cerca PdM" options={pdmOptions} value={currentItem ? [currentItem.pdm] : []} onToggle={(v) => setCurrentPdmId(v)}
-        searchable itemColor={TEXT_LIGHT} itemSizePt={9}
-        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={10} />
+        searchable itemColor={TEXT_LIGHT} itemSizePt={8}
+        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={9.5}
+      />
 
-      {/* ================= Card Posizione (Linea / Località / Tratta) ================= */}
-      <PbiDataTable x={500} y={8} w={220} h={60} z={47000}
+      {/* Card Posizione: Linea InRete / Località/Tratta */}
+      <PbiDataTable
+        x={485} y={8} w={195} h={95} z={47000}
         columns={[
-          { label: 'Linea InRete', value: currentItem.linea },
-          { label: 'Località/Tratta', value: currentItem.localita_tratta },
+          { label: 'Linea InRete', value: currentItem.linea || '-' },
+          { label: 'Località/Tratta', value: currentItem.localita_tratta || '-' },
         ]}
-        widths={[110, 110]}
+        widths={[95, 100]}
         headerBackground={HEADER} headerColor={WHITE} headerSizePt={9}
         rowBackground={CANVAS} rowColor={WHITE} rowSizePt={9}
-        borderColor={MUTED} />
+        borderColor={MUTED}
+      />
 
-      {/* ================= Card Classificazione / Stato scadenza ================= */}
-      <PbiDataTable x={728} y={8} w={270} h={60} z={32000}
+      {/* Card Classificazione / Stato scadenza */}
+      <PbiDataTable
+        x={688} y={8} w={275} h={95} z={32000}
         columns={[
-          { label: 'Classificazione', value: currentItem.classificazione_stato, color: classificazioneColor(currentItem.classificazione_stato) },
-          { label: 'Stato scadenza', value: currentItem.scadenza, color: scadenzaColor(currentItem.scadenza) },
+          { label: 'Classificazione', value: currentItem.classificazione_stato || '-', color: classificazioneColor(currentItem.classificazione_stato || '') },
+          { label: 'Stato scadenza', value: currentItem.scadenza || '-', color: scadenzaColor(currentItem.scadenza || '') },
         ]}
-        widths={[150, 120]}
+        widths={[150, 125]}
         headerBackground={HEADER} headerColor={WHITE} headerSizePt={9}
         rowBackground={CANVAS} rowColor={WHITE} rowSizePt={9}
-        borderColor={PURPLE} />
+        borderColor={PURPLE}
+      />
 
-      {/* ================= Riferimento temporale e Titoli (riga y=74) ================= */}
-      <PbiText x={15} y={72} w={230} h={26} z={7000}
-        text="Difetti di binario - DOIT VE" sizePt={16} bold color={RED} background={CANVAS} />
-      <PbiText x={250} y={72} w={80} h={26} z={37000}
-        text="Drill V5" sizePt={15} bold color={TEXT_LIGHT} background={CANVAS} />
-      <PbiText x={335} y={74} w={110} h={22} z={34000}
-        text="Dati aggiornati al:" sizePt={10} color={MUTED} align="right" vAlign="middle" background={CANVAS} />
-      <PbiText x={450} y={74} w={130} h={22} z={13000}
-        text={dataAggiornamento} sizePt={11} color={TEXT_LIGHT} vAlign="middle" background={CANVAS} />
+      {/* ================= Riferimento temporale e Titoli (riga y=114 a 142) ================= */}
+      <PbiText
+        x={20} y={116} w={320} h={26} z={7000}
+        text="Difetti di binario - DOIT VE" sizePt={16} bold color={RED}
+      />
+      <PbiText
+        x={345} y={117} w={90} h={24} z={37000}
+        text="Drill V5" sizePt={15} bold color={TEXT_LIGHT}
+      />
+      <PbiText
+        x={440} y={120} w={125} h={20} z={34000}
+        text="Dati aggiornati al:" sizePt={10} color={MUTED} vAlign="middle"
+      />
+      <PbiText
+        x={565} y={120} w={140} h={20} z={13000}
+        text={dataAggiornamento} sizePt={10.5} color={TEXT_LIGHT} vAlign="middle"
+      />
 
-      {/* ================= Etichette sezioni ================= */}
-      <PbiText x={23.57682619647355} y={117.88413098236775} w={150.52896725440806} h={30.83123425692695} z={30000}
-        text="Dati PdM" sizePt={11} bold color={TEXT_LIGHT} />
-      <PbiText x={18.55163727772889} y={418.9420654913001} w={159} h={31} z={10000}
-        text="Dati avviso" sizePt={11} bold color={TEXT_LIGHT} background={CANVAS} />
-      <PbiText x={1114.4584382871535} y={119.6977329974811} w={93.40050377833752} h={29.924433249370274} z={31000}
-        text="Stato PdM" sizePt={11} bold color={TEXT_LIGHT} />
-      <PbiText x={1113.5516372777283} y={417.9420654913001} w={166} h={31} z={29000}
-        text="Stato avviso" sizePt={11} bold color={TEXT_LIGHT} />
+      {/* ================= SEZIONE DATI PDM (y=155 a 465) ================= */}
+      <PbiText x={20} y={156} w={150} h={22} z={30000} text="Dati PdM" sizePt={11} bold color={TEXT_LIGHT} />
+      <PbiText x={835} y={156} w={125} h={22} z={31000} text="Stato PdM" sizePt={11} bold color={TEXT_LIGHT} />
 
-      {/* ================= Dati PdM: Punto di Misura ================= */}
-      <PbiDataTable x={19} y={151} w={1053} h={65} z={14000}
+      {/* Riga 1 PdM: PdM, Classe, Osservazioni */}
+      <PbiDataTable
+        x={20} y={180} w={800} h={60} z={14000}
         columns={[
-          { label: 'PdM', value: currentItem.pdm },
-          { label: 'Classe prov. def.', value: currentItem.classe },
-          { label: 'Osservazioni def.', value: currentItem.osservazioni },
+          { label: 'PdM', value: currentItem.pdm || '-' },
+          { label: 'Classe prov.', value: currentItem.classe || '-' },
+          { label: 'Osservazioni', value: currentItem.osservazioni || '-' },
         ]}
-        widths={[90.57170808220056, 93, 98.44147529535977, 825.6159122426678]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={BAND} rowColor={WHITE} rowSizePt={10}
-        borderColor={RED} />
+        widths={[90, 95, 615]}
+        borderColor={RED}
+      />
 
-      {/* ================= Dati PdM: Posizione ================= */}
-      <PbiDataTable x={19} y={212} w={1069} h={65} z={17000}
+      {/* Riga 2 PdM: Sede Tecnica, Cod. linea, Km linea */}
+      <PbiDataTable
+        x={20} y={246} w={360} h={60} z={17000}
         columns={[
-          { label: 'Tratta', value: currentItem.localita_tratta },
-          { label: 'Cod. linea', value: currentItem.cod_linea ?? '' },
-          { label: 'Km linea', value: currentItem.km_linea },
+          { label: 'Sede Tecnica', value: currentItem.sede_tecnica || '-' },
+          { label: 'Cod. linea', value: currentItem.cod_linea || '-' },
+          { label: 'Km linea', value: currentItem.km_linea || '-' },
         ]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={BAND} rowColor={WHITE} rowSizePt={10}
-        borderColor={RED} />
+        widths={[180, 90, 90]}
+        borderColor={RED}
+      />
 
-      {/* ================= Dati PdM: Dettagli ================= */}
-      <PbiDataTable x={19} y={274} w={1061} h={64} z={15000}
+      {/* Riga 3 PdM: Dettagli difetto */}
+      <PbiDataTable
+        x={20} y={312} w={800} h={60} z={15000}
         columns={[
-          { label: 'Dev.', value: currentItem.dev ?? '' },
-          { label: 'Bin.', value: currentItem.bin ?? '' },
-          { label: 'Fila', value: currentItem.fila ?? '' },
-          { label: 'Tipo difetto', value: currentItem.tipo_difetto },
-          { label: 'Tipo Arm.', value: currentItem.tipo_arm ?? '' },
-          { label: 'Val. (%/mm)', value: currentItem.val_perc_mm ?? '' },
-          { label: 'Prof. Dif.', value: currentItem.prof_dif ?? '' },
-          { label: 'Pos. Dif', value: currentItem.pos_dif ?? '' },
-          { label: 'Ubi lin.', value: currentItem.ubi_lin ?? '' },
-          { label: 'T. tratta ragg. fug.', value: currentItem.t_tratta_ragg_fug ?? '' },
+          { label: 'Dev.', value: currentItem.dev || '-' },
+          { label: 'Bin.', value: currentItem.bin || '-' },
+          { label: 'Fila', value: currentItem.fila || '-' },
+          { label: 'Tipo difetto', value: currentItem.tipo_difetto || '-' },
+          { label: 'Tipo Arm.', value: currentItem.tipo_arm || '-' },
+          { label: 'Val. (%/mm)', value: currentItem.val_perc_mm || '-' },
+          { label: 'Prof. Dif.', value: currentItem.prof_dif || '-' },
+          { label: 'Pos. Dif', value: currentItem.pos_dif || '-' },
+          { label: 'Ubi lin.', value: currentItem.ubi_lin || '-' },
+          { label: 'T. tratta ragg. fug.', value: currentItem.t_tratta_ragg_fug || '-' },
         ]}
-        widths={[90.57170808220056, 93, 60, 57, 51, 103, 96, 86, 65, 140, 82, 116]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={BAND} rowColor={WHITE} rowSizePt={10}
-        borderColor={RED} />
+        widths={[65, 50, 50, 95, 80, 80, 70, 80, 80, 150]}
+        borderColor={RED}
+      />
 
-      {/* ================= Dati PdM: Saldatura ================= */}
-      <PbiDataTable x={19.23076923076923} y={337.6923076923077} w={668.4615384615385} h={61.53846153846153} z={16000}
+      {/* Riga 4 PdM: Saldatura & Creazione */}
+      <PbiDataTable
+        x={20} y={378} w={570} h={60} z={16000}
         columns={[
-          { label: 'Tipo Sald.', value: currentItem.tipo_sald ?? '' },
-          { label: 'Data esec. saldatura', value: currentItem.data_esec_saldatura ?? '' },
-          { label: 'Posizione sezione', value: currentItem.pos_sezione ?? '' },
-          { label: 'Sald. in gar.', value: currentItem.sald_in_gar ?? '' },
-          { label: 'Eseguito da', value: currentItem.esegui_to_da ?? '' },
-          { label: 'ID saldatore', value: currentItem.id_saldatore ?? '' },
+          { label: 'Tipo Sald.', value: currentItem.tipo_sald || '-' },
+          { label: 'Data esec. saldatura', value: currentItem.data_esec_saldatura || '-' },
+          { label: 'Pos. sezione', value: currentItem.pos_sezione || '-' },
+          { label: 'Sald. in gar.', value: currentItem.sald_in_gar || '-' },
+          { label: 'Eseguito da', value: currentItem.esegui_to_da || '-' },
+          { label: 'ID saldatore', value: currentItem.id_saldatore || '-' },
         ]}
-        widths={[90.57170808220056, 93, 95, 132, 115, 83, 123, 106.84615753916452]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={BAND} rowColor={WHITE} rowSizePt={10}
-        borderColor={RED} />
-
-      {/* ================= Dati PdM: Creato da / Data creazione ================= */}
-      <PbiDataTable x={687.6923076923076} y={337.6923076923077} w={188.46153846153845} h={61.53846153846153} z={45000}
+        widths={[80, 115, 95, 80, 100, 100]}
+        borderColor={RED}
+      />
+      <PbiDataTable
+        x={600} y={378} w={220} h={60} z={45000}
         columns={[
-          { label: 'Creato da', value: currentItem.creato_da ?? '' },
-          { label: 'Data creazione', value: currentItem.data_creazione },
+          { label: 'Creato da', value: currentItem.creato_da || '-' },
+          { label: 'Data creazione', value: currentItem.data_creazione || '-' },
         ]}
-        widths={[90.57170808220056, 93, 78.26285472202176]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={BAND} rowColor={WHITE} rowSizePt={10}
-        borderColor={RED} />
+        widths={[100, 120]}
+        borderColor={RED}
+      />
 
-      {/* ================= Dati avviso: Avviso ================= */}
-      <PbiDataTable x={19} y={458} w={541} h={63} z={21000}
+      {/* Pannello Destro: Stato PdM (cards viola) */}
+      <PbiDataTable
+        x={835} y={180} w={125} h={56} z={18000}
+        columns={[{ label: "Tolto d'opera", value: currentItem.tolto_dop, color: toltoColor(currentItem.tolto_dop) }]}
+        widths={[125]}
+        headerBackground={HEADER} rowBackground={PANEL} rowSizePt={12}
+        borderColor={PURPLE}
+      />
+      <PbiDataTable
+        x={835} y={246} w={125} h={56} z={19000}
+        columns={[{ label: 'Data Scoperta', value: currentItem.data_scoperta || '-' }]}
+        widths={[125]}
+        headerBackground={HEADER} rowBackground={PANEL} rowSizePt={10}
+        borderColor={PURPLE}
+      />
+      <PbiDataTable
+        x={835} y={312} w={125} h={56} z={20000}
+        columns={[{ label: 'Data Agg.', value: currentItem.data_creazione || '-' }]}
+        widths={[125]}
+        headerBackground={HEADER} rowBackground={PANEL} rowSizePt={10}
+        borderColor={PURPLE}
+      />
+      <PbiDataTable
+        x={835} y={378} w={125} h={56} z={22000}
+        columns={[{ label: "Data tolto d'op.", value: currentItem.data_tolto_dop || '-' }]}
+        widths={[125]}
+        headerBackground={HEADER} rowBackground={PANEL} rowSizePt={10}
+        borderColor={PURPLE}
+      />
+
+      {/* ================= SEZIONE DATI AVVISO (y=470 a 705) ================= */}
+      <PbiText x={20} y={472} w={150} h={22} z={10000} text="Dati avviso" sizePt={11} bold color={TEXT_LIGHT} />
+      <PbiText x={835} y={472} w={125} h={22} z={29000} text="Stato avviso" sizePt={11} bold color={TEXT_LIGHT} />
+
+      {/* Riga 1 Avviso: Avviso, Tipo, Descrizione + Autore, Data cr., Da, Data mod. */}
+      <PbiDataTable
+        x={20} y={496} w={410} h={60} z={21000}
         columns={[
           { label: 'Avviso', value: avvisoDetail.avviso },
-          { label: 'Tp.', value: avvisoDetail.tipo },
+          { label: 'Tipo', value: avvisoDetail.tipo },
           { label: 'Descrizione', value: avvisoDetail.descrizione },
         ]}
-        widths={[43, 389]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={BAND} rowColor={WHITE} rowSizePt={10}
-        borderColor={RED} />
-
-      {/* ================= Dati avviso: Sede tecnica ================= */}
-      <PbiDataTable x={19} y={527} w={475} h={67} z={35000}
+        widths={[85, 45, 280]}
+        borderColor={RED}
+      />
+      <PbiDataTable
+        x={440} y={496} w={380} h={60} z={27000}
         columns={[
-          { label: 'Sede tecnica', value: avvisoDetail.sede_tecnica },
-        ]}
-        widths={[90.57170808220056, 93, 262]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={BAND} rowColor={WHITE} rowSizePt={10}
-        borderColor={RED} />
-
-      {/* ================= Dati avviso: Autori ================= */}
-      <PbiDataTable x={613} y={457} w={467} h={64} z={27000}
-        columns={[
-          { label: 'Aut.avviso', value: avvisoDetail.autore },
-          { label: 'Data cr.', value: avvisoDetail.data_creazione },
-          { label: 'Da', value: avvisoDetail.ultima_mod },
+          { label: 'Autore', value: avvisoDetail.autore },
+          { label: 'Data creazione', value: avvisoDetail.data_creazione },
+          { label: 'Ultima mod.', value: avvisoDetail.ultima_mod },
           { label: 'Data modifica', value: avvisoDetail.data_modifica },
         ]}
-        widths={[102, 119, 121, 90]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={BAND} rowColor={WHITE} rowSizePt={10}
-        borderColor={RED} />
+        widths={[90, 100, 95, 95]}
+        borderColor={RED}
+      />
 
-      {/* ================= Dati avviso: Consuntivazione ================= */}
-      <PbiDataTable x={612} y={527} w={205} h={64} z={28000}
+      {/* Riga 2 Avviso: Sede tecnica + Ordine, Network */}
+      <PbiDataTable
+        x={20} y={562} w={410} h={60} z={35000}
+        columns={[{ label: 'Sede tecnica', value: avvisoDetail.sede_tecnica }]}
+        widths={[410]}
+        borderColor={RED}
+      />
+      <PbiDataTable
+        x={440} y={562} w={190} h={60} z={28000}
         columns={[
           { label: 'Ordine', value: avvisoDetail.ordine },
           { label: 'Network', value: avvisoDetail.network },
         ]}
-        widths={[90.57170808220056, 93]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={consuntivazioneAnomala ? RED : BAND} rowColor={WHITE} rowSizePt={10}
-        borderColor={RED} />
-
-      {/* ================= Dati avviso: Testo avviso ================= */}
-      <PbiDataTable x={18.579067990832694} y={596.4858670741023} w={1071.7188693659282} h={101.69595110771581} z={26000}
-        columns={[
-          { label: 'Testo Esteso', value: avvisoDetail.testo_esteso },
-        ]}
-        widths={[1048.119623081706]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={BAND} rowColor={WHITE} rowSizePt={10}
+        widths={[95, 95]}
         borderColor={RED}
-        wordWrap />
+      />
 
-      {/* ================= Stato PdM (pannello destro) ================= */}
-      <PbiDataTable x={1114.1565217391305} y={150.2608695652174} w={148.03478260869565} h={61.21739130434783} z={18000}
-        columns={[{ label: "Tolto d'opera", value: currentItem.tolto_dop, color: toltoColor(currentItem.tolto_dop) }]}
-        widths={[131.49999499080235]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={PANEL} rowColor={WHITE} rowSizePt={12}
-        borderColor={PURPLE} />
+      {/* Riga 3 Avviso: Testo Esteso */}
+      <PbiDataTable
+        x={20} y={628} w={800} h={76} z={26000}
+        columns={[{ label: 'Testo Esteso', value: avvisoDetail.testo_esteso }]}
+        widths={[800]}
+        borderColor={RED}
+        wordWrap
+      />
 
-      <PbiDataTable x={1114.1565217391305} y={207.02608695652174} w={148.03478260869565} h={61.21739130434783} z={19000}
-        columns={[{ label: 'Data Scoperta', value: currentItem.data_scoperta }]}
-        widths={[131.51810940734782]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={PANEL} rowColor={WHITE} rowSizePt={12}
-        borderColor={PURPLE} />
-
-      <PbiDataTable x={1114.1565217391305} y={266.0173913043478} w={148.03478260869565} h={61.21739130434783} z={20000}
-        columns={[{ label: 'Data Agg.', value: currentItem.data_creazione }]}
-        widths={[131.51810940734782]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={PANEL} rowColor={WHITE} rowSizePt={12}
-        borderColor={PURPLE} />
-
-      <PbiDataTable x={1114.4584382871535} y={325.5415617128463} w={147.80856423173802} h={57.12846347607052} z={40000}
-        columns={[{ label: "Data tolto d'opera", value: currentItem.data_tolto_dop }]}
-        widths={[131.51810940734782]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={PANEL} rowColor={WHITE} rowSizePt={12}
-        borderColor={PURPLE} />
-
-      <PbiDataTable x={1107.2040302267} y={351.8387909319899} w={170.4785894206549} h={54.4080604534005} z={39000}
-        columns={[{ label: 'Ritardo PdM', value: currentItem.ritardo_pdm ?? '', color: RED }]}
-        widths={[143.45435586485283]}
-        headerBackground={PANEL} headerColor={PANEL} headerSizePt={10}
-        rowBackground={PANEL} rowColor={RED} rowSizePt={12}
-        borderColor={PANEL} />
-
-      {/* ================= Stato avviso (pannello destro) ================= */}
-      <PbiDataTable x={1114} y={457} w={156} h={61} z={22000}
-        columns={[{ label: 'St.sist.', value: avvisoDetail.stato_sistema, color: statoAvvisoColor(avvisoDetail.stato_sistema) }]}
-        widths={[131.49999499080235]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={PANEL} rowColor={WHITE} rowSizePt={12}
-        borderColor={PURPLE} />
-
-      <PbiDataTable x={1114.1565217391305} y={513.1130434782609} w={155.82608695652175} h={61.21739130434783} z={23000}
-        columns={[{ label: 'In. rich.', value: avvisoDetail.inizio_richiesta }]}
-        widths={[131.51810940734782]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={PANEL} rowColor={WHITE} rowSizePt={12}
-        borderColor={PURPLE} />
-
-      <PbiDataTable x={1114.1565217391305} y={573.2173913043479} w={155.82608695652175} h={60.10434782608696} z={24000}
-        columns={[{ label: 'FineRich.', value: avvisoDetail.fine_richiesta }]}
-        widths={[131.51810940734782, 132.36526709673592]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={PANEL} rowColor={WHITE} rowSizePt={12}
-        borderColor={PURPLE} />
-
-      <PbiDataTable x={1114.1565217391305} y={632.2086956521739} w={148.03478260869565} h={56.76521739130435} z={25000}
-        columns={[{ label: 'Data chiusura', value: avvisoDetail.data_chiusura, color: chiusuraRitardo ? RED : WHITE }]}
-        widths={[130.86049987735453]}
-        headerBackground={HEADER} headerColor={WHITE} headerSizePt={10}
-        rowBackground={PANEL} rowColor={WHITE} rowSizePt={12}
-        borderColor={PURPLE} />
-
-      <PbiDataTable x={1109.0176322418135} y={658.3375314861461} w={171.38539042821156} h={61.6624685138539} z={3000}
-        columns={[{ label: 'Ritardo Avv.', value: avvisoDetail.ritardo_avv, color: RED }]}
-        widths={[140.32891719311414]}
-        headerBackground={PANEL} headerColor={PANEL} headerSizePt={10}
-        rowBackground={PANEL} rowColor={RED} rowSizePt={12}
-        borderColor={PANEL} />
+      {/* Pannello Destro: Stato Avviso (cards viola) */}
+      <PbiDataTable
+        x={835} y={496} w={125} h={48} z={23000}
+        columns={[{ label: 'Stato sistema', value: avvisoDetail.stato_sistema, color: statoAvvisoColor(avvisoDetail.stato_sistema) }]}
+        widths={[125]}
+        headerBackground={HEADER} rowBackground={PANEL} rowSizePt={10}
+        borderColor={PURPLE}
+      />
+      <PbiDataTable
+        x={835} y={550} w={125} h={48} z={24000}
+        columns={[{ label: 'Inizio richiesta', value: avvisoDetail.inizio_richiesta || '-' }]}
+        widths={[125]}
+        headerBackground={HEADER} rowBackground={PANEL} rowSizePt={10}
+        borderColor={PURPLE}
+      />
+      <PbiDataTable
+        x={835} y={604} w={125} h={48} z={25000}
+        columns={[{ label: 'Fine richiesta', value: avvisoDetail.fine_richiesta || '-' }]}
+        widths={[125]}
+        headerBackground={HEADER} rowBackground={PANEL} rowSizePt={10}
+        borderColor={PURPLE}
+      />
+      <PbiDataTable
+        x={835} y={658} w={125} h={48} z={38000}
+        columns={[{ label: 'Data chiusura', value: avvisoDetail.data_chiusura || '-' }]}
+        widths={[125]}
+        headerBackground={HEADER} rowBackground={PANEL} rowSizePt={10}
+        borderColor={PURPLE}
+      />
     </PbiCanvas>
   );
 };

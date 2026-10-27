@@ -139,41 +139,69 @@ const DashBars: React.FC<{
   data: BarDatum[];
   showLegend?: boolean;
   hideAxis?: boolean;
-  axisWidth?: number;
+  legendWidth?: number;
   labelSizePt?: number;
   barSize?: number;
-}> = ({ x, y, w, h, z, data, showLegend, hideAxis, axisWidth = 82, labelSizePt = 9, barSize = 12 }) => (
-  <PbiBox x={x} y={y} w={w} h={h} z={z} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-    <div style={{ flex: '1 1 auto', minHeight: 0 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 2, right: 24, left: 2, bottom: 2 }}>
-          <XAxis type="number" hide />
-          <YAxis
-            type="category"
-            dataKey="name"
-            width={hideAxis ? 1 : axisWidth}
-            hide={hideAxis}
-            tickLine={false}
-            axisLine={false}
-            tick={{ fill: PBI_COLORS.textLight, fontSize: 9 }}
-          />
-          <Bar dataKey="value" isAnimationActive={false} barSize={barSize}>
-            {data.map((d, i) => <Cell key={i} fill={d.color} />)}
-            <LabelList dataKey="value" position="right" fill={PBI_COLORS.textMuted} fontSize={fontSizePx(labelSizePt)} />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
+  topPadding?: number;
+  labelColor?: string;
+}> = ({
+  x,
+  y,
+  w,
+  h,
+  z,
+  data,
+  showLegend,
+  hideAxis,
+  legendWidth = 82,
+  labelSizePt = 9,
+  barSize = 12,
+  topPadding = 34,
+  labelColor = PBI_COLORS.textMuted,
+}) => (
+  <PbiBox
+    x={x}
+    y={y}
+    w={w}
+    h={h}
+    z={z}
+    style={{ display: 'flex', overflow: 'hidden', padding: '0 8px 8px 8px', boxSizing: 'border-box' }}
+  >
     {showLegend && (
-      <div style={{ flex: '0 0 auto', display: 'flex', flexWrap: 'wrap', gap: 8, padding: '0 6px 2px', fontSize: fontSizePx(8), color: PBI_COLORS.textMuted }}>
+      <div
+        style={{
+          width: legendWidth,
+          flex: `0 0 ${legendWidth}px`,
+          paddingTop: topPadding,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          gap: 6,
+          fontSize: fontSizePx(8),
+          color: PBI_COLORS.textMuted,
+          overflow: 'hidden',
+        }}
+      >
         {data.map((d) => (
-          <span key={d.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 8, height: 8, background: d.color, display: 'inline-block' }} />
-            {d.name}
+          <span key={d.name} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+            <span style={{ width: 8, height: 8, background: d.color, display: 'inline-block', flex: '0 0 auto' }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</span>
           </span>
         ))}
       </div>
     )}
+    <div style={{ flex: '1 1 auto', minWidth: 0, minHeight: 0, paddingTop: topPadding, position: 'relative' }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 28, left: 0, bottom: 0 }}>
+          <XAxis type="number" hide />
+          <YAxis type="category" dataKey="name" width={1} hide={hideAxis ?? showLegend ?? true} />
+          <Bar dataKey="value" isAnimationActive={false} barSize={barSize}>
+            {data.map((d, i) => <Cell key={i} fill={d.color} />)}
+            <LabelList dataKey="value" position="right" fill={labelColor} fontSize={fontSizePx(labelSizePt)} />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   </PbiBox>
 );
 
@@ -356,6 +384,7 @@ export const PageDashboardV5: React.FC<PageDashboardV5Props> = ({
   return (
     <PbiCanvas>
       {/* ================= Sfondi / pannelli ================= */}
+      <PbiShape x={1032.22} y={202.22} w={247.78} h={85.56} z={0} fill={PBI_COLORS.panel} radius={10} />
       <PbiShape x={1030.9090909090908} y={278.1818181818182} w={249.09090909090907} h={85.45454545454545} z={1000} fill={PBI_COLORS.panel} radius={10} />
       <PbiShape x={242.22222222222223} y={201.11111111111111} w={411.1111111111111} h={187.77777777777777} z={4000} fill={PBI_COLORS.panel} radius={5} />
       <PbiShape x={0} y={475.55555555555554} w={1280} h={244.44444444444443} z={7000} fill={PBI_COLORS.band} radius={5} />
@@ -479,17 +508,17 @@ export const PageDashboardV5: React.FC<PageDashboardV5Props> = ({
 
       {/* ================= Bar chart ================= */}
       <DashBars x={14.444444444444445} y={164.44444444444443} w={226.66666666666666} h={155.55555555555554} z={34000}
-        data={barTolto} showLegend axisWidth={22} />
+        data={barTolto} showLegend legendWidth={34} topPadding={48} />
       <DashBars x={12.222222222222221} y={253.33333333333331} w={228.88888888888889} h={155.55555555555554} z={36000}
-        data={barAvvisoChiuso} showLegend axisWidth={22} />
+        data={barAvvisoChiuso} showLegend legendWidth={34} topPadding={48} />
       <DashBars x={14.545454545454545} y={359.99999999999994} w={614.5454545454545} h={125.45454545454544} z={59000}
-        data={barPresenza} showLegend axisWidth={110} />
+        data={barPresenza} showLegend legendWidth={146} topPadding={28} />
       <DashBars x={666.3636363636363} y={353.6363636363636} w={595.4545454545454} h={131.8181818181818} z={53000}
-        data={barNetworkOdl} showLegend axisWidth={22} />
+        data={barNetworkOdl} showLegend legendWidth={134} topPadding={28} />
       <DashBars x={1177.9558902635852} y={211.30132589470563} w={91.53846153846153} h={64.61538461538461} z={40000}
-        data={barNonVisibile} hideAxis labelSizePt={9} barSize={16} />
+        data={barNonVisibile} hideAxis labelSizePt={9} barSize={16} topPadding={22} labelColor={PBI_COLORS.textLight} />
       <DashBars x={1178.1818181598576} y={290.834710718682} w={90} h={51} z={43000}
-        data={barToltoFutura} hideAxis labelSizePt={9} barSize={16} />
+        data={barToltoFutura} hideAxis labelSizePt={9} barSize={16} topPadding={18} labelColor={PBI_COLORS.textLight} />
 
       {/* ================= Etichette ================= */}
       <PbiText x={15.372750369407493} y={183.8118070386205} w={226} h={30} z={33000} text="PdM tolto d'opera" sizePt={9} color={PBI_COLORS.textLight} />

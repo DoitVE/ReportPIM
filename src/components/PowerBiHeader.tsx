@@ -46,7 +46,7 @@ export const PowerBiHeader: React.FC<PowerBiHeaderProps> = ({
                 )}
               </div>
               <span className="text-[11px] text-slate-400 block -mt-0.5">
-                Power BI Embedded Web App • Ingegneria Manutenzione Armamento
+                Web App • Ingegneria Manutenzione Armamento
               </span>
             </div>
           </div>

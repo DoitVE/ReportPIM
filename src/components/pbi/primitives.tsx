@@ -23,7 +23,7 @@ export const PBI_COLORS = {
   canvas: '#1B1C1F',
   card: '#2B2D31',
   cardAlt: '#2A2E32',
-  panel: '#3A3D44',
+  panel: '#3B3D45',
   band: '#2B2B2B',
   tableHeader: '#000000',
   tableRowPrimary: '#333333',

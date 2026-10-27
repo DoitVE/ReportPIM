@@ -146,9 +146,6 @@ export const PowerBiTabs: React.FC<PowerBiTabsProps> = ({
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
         <div className="h-4 w-px bg-[#cbd5e1]" />
-        <span className="text-[10px] font-semibold text-[#64748b] hidden md:inline">
-          Power BI
-        </span>
       </div>
     </footer>
   );

@@ -91,7 +91,13 @@ export const App: React.FC = () => {
   const isCanvasPage =
     activeSection === 'avvisi_v5' ||
     activeSection === 'dashboard_v5' ||
-    activeSection === 'cerca_sete_v5';
+    activeSection === 'cerca_sete_v5' ||
+    activeSection === 'avvisi_v3v4' ||
+    activeSection === 'frequenza_v3v4' ||
+    activeSection === 'drill_frequenza_v3v4' ||
+    activeSection === 'drill_v5' ||
+    activeSection === 'abbattimento_codici' ||
+    activeSection === 'quick_user_guide';
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#18191c] flex flex-col font-sans select-none text-slate-100">

@@ -1,0 +1,29 @@
+# Dipendenze
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+*.local
+
+# Variabili d'ambiente (mantieni solo il template)
+.env
+.env.*
+!.env.example
+
+# Artefatti IDE / tool
+.aistudio/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+
+# Artefatti generati (estrazione guida PDF)
+extracted_guide.txt
+
+# Log
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

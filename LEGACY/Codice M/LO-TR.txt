@@ -1,0 +1,9 @@
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\LO-TR.xlsx"), null, true),
+    #"LO-TR_Sheet" = Origine{[Item="LO-TR",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(#"LO-TR_Sheet", [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Sede tecnica", type text}, {"Definizione", type text}, {"Divis. ubic.", type text}, {"Stato utente", type text}, {"Stato sistema", type text}, {"Km. Inizio", type number}, {"CdC", Int64.Type}, {"Codice linea InRete", type text}, {"Linea InRete", type text}, {"Linea Profilo", type text}, {"LVU", type text}, {"ISU", type text}, {"TEU", type text}, {"Lavori Armamento", type text}, {"Impianti di Sicurezz", type text}, {"Trazione Elettrica", type text}, {"Linea  Primaria", type text}, {"Luce/Forza motrice", type text}, {"Sotto Stazione Elett", type text}, {"Spec. Sotto Stazione", type text}, {"Spec. Telecomandi SS", type text}, {"Spec. Diagnostica", type text}, {"Spec. Diag. Armament", type text}, {"Spec. Cant. Meccaniz", type text}, {"Spec. Ponti", type text}, {"Spec. IS Attivazioni", type text}, {"Spec. IS Telecomandi", type text}, {"Spec. IS Centraline/", type text}, {"Spec. Sup.Fis.Trasm.", type text}, {"Spec. Alta Frequenza", type text}, {"Spec. Trasmissione D", type text}, {"Spec. Central.Tel.Au", type text}, {"Spec. Radiotelefonia", type text}}),
+    #"Rinominate colonne" = Table.RenameColumns(#"Modificato tipo",{{"Definizione", "Località/Tratta"}}),
+    #"Sostituito valore" = Table.ReplaceValue(#"Rinominate colonne","","N.D.",Replacer.ReplaceValue,{"Divis. ubic."})
+in
+    #"Sostituito valore"

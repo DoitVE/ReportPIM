@@ -1,0 +1,8 @@
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\ZAVVISI_TXT.xlsx"), null, true),
+    Data_Sheet = Origine{[Item="Data",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(Data_Sheet, [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Numero avviso", Int64.Type}, {"Testo Esteso", type text}}),
+    #"Modificato tipo1" = Table.TransformColumnTypes(#"Modificato tipo",{{"Numero avviso", type text}})
+in
+    #"Modificato tipo1"

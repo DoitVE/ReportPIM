@@ -1,0 +1,9 @@
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\CAOR_ODL.xlsx"), null, true),
+    CAOR_ODL_Sheet = Origine{[Item="CAOR_ODL",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(CAOR_ODL_Sheet, [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Data", type date}, {"Creato il", type date}}),
+    #"Raggruppate righe" = Table.Group(#"Modificato tipo", {"Ord. dest."}, {{"Data prima consuntivazione", each List.Min([Data]), type nullable date}, {"Data ultima consuntivazione", each List.Max([Data]), type nullable date}, {"Ore consuntivate", each List.Sum([#"       Ore"]), type number}}),
+    #"Rinominate colonne" = Table.RenameColumns(#"Raggruppate righe",{{"Ore consuntivate", "Ore cons. su OdL"}, {"Data prima consuntivazione", "Data prima cons. su OdL"}, {"Data ultima consuntivazione", "Data ultima cons. su OdL"}})
+in
+    #"Rinominate colonne"

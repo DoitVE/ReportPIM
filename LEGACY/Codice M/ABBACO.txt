@@ -1,0 +1,5 @@
+let
+    Origine = Table.Combine({#"ABBACO Bologna-Padova", #"ABBACO Mestre-Quarto", #"ABBACO Mestre-Treviso", #"ABBACO Milano-Venezia SL"}),
+    #"Caratteri iniziali estratti" = Table.TransformColumns(Origine, {{"Codice Tratta INRETE", each Text.Start(_, 6), type text}})
+in
+    #"Caratteri iniziali estratti"

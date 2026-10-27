@@ -1,0 +1,5 @@
+{
+  "name": "Report PIM - Difetti Armamento",
+  "description": "Piattaforma per il monitoraggio, controllo e analisi dei difetti di armamento ferroviario (Avvisi SAP V3, V4, V5, carrelli diagnostici VEM, rallentamenti ABBA.CO e audit ordini di lavoro).",
+  "capabilities": []
+}

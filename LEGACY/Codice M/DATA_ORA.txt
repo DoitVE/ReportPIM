@@ -1,0 +1,7 @@
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\DATA_ORA.xlsx"), null, true),
+    Foglio1_Sheet = Origine{[Item="Foglio1",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(Foglio1_Sheet, [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Data e ora scarico dati:", type datetime}})
+in
+    #"Modificato tipo"

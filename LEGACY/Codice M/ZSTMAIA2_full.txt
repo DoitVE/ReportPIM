@@ -1,0 +1,13 @@
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\ZSTMAIA2_full.xlsx"), null, true),
+    Data_Sheet = Origine{[Item="Data",Kind="Sheet"]}[Data],
+    #"Rimosse prime righe" = Table.Skip(Data_Sheet,21),
+    #"Rimosse colonne" = Table.RemoveColumns(#"Rimosse prime righe",{"Column2", "Column5", "Column7", "Column9", "Column12", "Column13", "Column14", "Column15", "Column18", "Column20", "Column24", "Column34"}),
+    #"Ultime righe rimosse" = Table.RemoveLastN(#"Rimosse colonne",32),
+    #"Righe vuote rimosse" = Table.SelectRows(#"Ultime righe rimosse", each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    #"Filtrate righe" = Table.SelectRows(#"Righe vuote rimosse", each not Text.Contains([Column11], "N.PUNTO DI") and not Text.Contains([Column11], "MISURA")),
+    #"Rinominate colonne" = Table.RenameColumns(#"Filtrate righe",{{"Column1", "Data scoperta"}, {"Column3", "Cod. linea"}, {"Column4", "Cod. tratta"}, {"Column6", "Dev."}, {"Column8", "Bin"}, {"Column10", "km linea"}, {"Column11", "Pdm"}, {"Column16", "Ubi lin."}, {"Column17", "T. tratta ragg. fug."}, {"Column19", "Fila"}, {"Column21", "Tipo difetto"}, {"Column22", "Classe prov."}, {"Column23", "Valore (%/mm)"}, {"Column25", "Posizione difetto"}, {"Column26", "Tipo Sald."}, {"Column27", "Data esec. saldatura"}, {"Column28", "Posizione sezione"}, {"Column29", "Sald. in gar."}, {"Column30", "Tolto d'opera"}, {"Column31", "Data tolto d'opera"}, {"Column32", "Eseguito da"}, {"Column33", "ID saldatore"}}),
+    #"Sostituito valore" = Table.ReplaceValue(#"Rinominate colonne","00/00/0000",null,Replacer.ReplaceValue,{"Data scoperta"}),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Sostituito valore",{{"Data scoperta", type date}, {"Data tolto d'opera", type date}})
+in
+    #"Modificato tipo"

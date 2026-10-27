@@ -1,0 +1,7 @@
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\IK07_attivo.xlsx"), null, true),
+    Data_Sheet = Origine{[Item="Data",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(Data_Sheet, [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Autore modifica", Int64.Type}, {"Punto di misura", type any}, {"Descrizione", type text}, {"Sede tecnica", type text}, {"Tipo punto di mis.", type text}, {"Gruppo codici", type text}, {"Pos. misura", type text}, {"Punto mis. inattivo", type text}, {"Tipo catalogo", Int64.Type}, {"Chiave lingua", type text}, {"Creato da", Int64.Type}, {"Data creazione", type date}, {"Data modifica", type date}, {"Mandante", Int64.Type}, {"N. ogg. punto mis.", type text}, {"Ind.punto mis. rif.", type text}, {"Indic. di canc.", type text}, {"Punto mis. è contat.", type text}, {"Punto mis. rif.", type text}, {"Tsto", type text}})
+in
+    #"Modificato tipo"

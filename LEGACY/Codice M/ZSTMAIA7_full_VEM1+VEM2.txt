@@ -1,0 +1,4 @@
+let
+    Origine = Table.Combine({ZSTMAIA7_full_VEM1, ZSTMAIA7_full_VEM2})
+in
+    Origine

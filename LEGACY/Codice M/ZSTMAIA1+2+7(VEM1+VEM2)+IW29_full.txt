@@ -1,0 +1,119 @@
+let
+    Origine = Table.NestedJoin(ZSTMAIA1_full, {"Pdm"}, ZSTMAIA2_full, {"Pdm"}, "ZSTMAIA2_full", JoinKind.FullOuter),
+    #"Tabella ZSTMAIA2_full espansa" = Table.ExpandTableColumn(Origine, "ZSTMAIA2_full", {"Data scoperta", "Cod. linea", "Cod. tratta", "Dev.", "Bin", "km linea", "Pdm", "Ubi lin.", "T. tratta ragg. fug.", "Fila", "Tipo difetto", "Classe prov.", "Valore (%/mm)", "Posizione difetto", "Tipo Sald.", "Data esec. saldatura", "Posizione sezione", "Sald. in gar.", "Tolto d'opera", "Data tolto d'opera", "Eseguito da", "ID saldatore"}, {"ZSTMAIA2_full.Data scoperta", "ZSTMAIA2_full.Cod. linea", "ZSTMAIA2_full.Cod. tratta", "ZSTMAIA2_full.Dev.", "ZSTMAIA2_full.Bin", "ZSTMAIA2_full.km linea", "ZSTMAIA2_full.Pdm", "ZSTMAIA2_full.Ubi lin.", "ZSTMAIA2_full.T. tratta ragg. fug.", "ZSTMAIA2_full.Fila", "ZSTMAIA2_full.Tipo difetto", "ZSTMAIA2_full.Classe prov.", "ZSTMAIA2_full.Valore (%/mm)", "ZSTMAIA2_full.Posizione difetto", "ZSTMAIA2_full.Tipo Sald.", "ZSTMAIA2_full.Data esec. saldatura", "ZSTMAIA2_full.Posizione sezione", "ZSTMAIA2_full.Sald. in gar.", "ZSTMAIA2_full.Tolto d'opera", "ZSTMAIA2_full.Data tolto d'opera", "ZSTMAIA2_full.Eseguito da", "ZSTMAIA2_full.ID saldatore"}),
+    #"Merge ZSTMAIA7_full_VEM1+VEM2" = Table.NestedJoin(#"Tabella ZSTMAIA2_full espansa", {"Pdm"}, #"ZSTMAIA7_full_VEM1+VEM2", {"Pdm"}, "ZSTMAIA7_full_VEM1+VEM2", JoinKind.FullOuter),
+    #"Tabella ZSTMAIA7_full_VEM1+VEM2 espansa" = Table.ExpandTableColumn(#"Merge ZSTMAIA7_full_VEM1+VEM2", "ZSTMAIA7_full_VEM1+VEM2", {"Data scoperta", "Cod. linea", "Cod. SeTe", "Bin.", "Fila", "km linea", "Tipo difetto", "Classe porvv.", "Tolto d'opera", "Data tolto d'opera", "Centro di lavoro", "Pdm", "N. doc. di misura", "Avviso"}, {"ZSTMAIA7_full_VEM1+VEM2.Data scoperta", "ZSTMAIA7_full_VEM1+VEM2.Cod. linea", "ZSTMAIA7_full_VEM1+VEM2.Cod. SeTe", "ZSTMAIA7_full_VEM1+VEM2.Bin.", "ZSTMAIA7_full_VEM1+VEM2.Fila", "ZSTMAIA7_full_VEM1+VEM2.km linea", "ZSTMAIA7_full_VEM1+VEM2.Tipo difetto", "ZSTMAIA7_full_VEM1+VEM2.Classe porvv.", "ZSTMAIA7_full_VEM1+VEM2.Tolto d'opera", "ZSTMAIA7_full_VEM1+VEM2.Data tolto d'opera", "ZSTMAIA7_full_VEM1+VEM2.Centro di lavoro", "ZSTMAIA7_full_VEM1+VEM2.Pdm", "ZSTMAIA7_full_VEM1+VEM2.N. doc. di misura", "ZSTMAIA7_full_VEM1+VEM2.Avviso"}),
+    #"Merge IW29_full" = Table.NestedJoin(#"Tabella ZSTMAIA7_full_VEM1+VEM2 espansa", {"ZSTMAIA7_full_VEM1+VEM2.Avviso"}, IW29_full, {"Avviso"}, "IW29_full", JoinKind.FullOuter),
+    #"Tabella IW29_full espansa" = Table.ExpandTableColumn(#"Merge IW29_full", "IW29_full", {"Tp.", "Avviso", "Descrizione", "Ordine", "Sede tecnica", "FineRich.", "In. rich.", "St.pag.", "St.sist.", "St.utente", "Autore", "Da", "Aut.avviso", "Data chiusura", "Data avviso", "Data cr.", "Data rif.", "Data modifica", "Dt.rif.cl.", "Network", "Op."}, {"IW29_full.Tp.", "IW29_full.Avviso", "IW29_full.Descrizione", "IW29_full.Ordine", "IW29_full.Sede tecnica", "IW29_full.FineRich.", "IW29_full.In. rich.", "IW29_full.St.pag.", "IW29_full.St.sist.", "IW29_full.St.utente", "IW29_full.Autore", "IW29_full.Da", "IW29_full.Aut.avviso", "IW29_full.Data chiusura", "IW29_full.Data avviso", "IW29_full.Data cr.", "IW29_full.Data rif.", "IW29_full.Data modifica", "IW29_full.Dt.rif.cl.", "IW29_full.Network", "IW29_full.Op."}),
+    #"Filtrate righe" = Table.SelectRows(#"Tabella IW29_full espansa", each true),
+    #"Merge ZAVVISI_TXT" = Table.NestedJoin(#"Filtrate righe", {"IW29_full.Avviso"}, ZAVVISI_TXT, {"Numero avviso"}, "ZAVVISI_TXT", JoinKind.LeftOuter),
+    #"Tabella ZAVVISI_TXT espansa" = Table.ExpandTableColumn(#"Merge ZAVVISI_TXT", "ZAVVISI_TXT", {"Testo Esteso"}, {"ZAVVISI_TXT.Testo Esteso"}),
+    #"Modificato tipo Data Scoperta" = Table.TransformColumnTypes(#"Tabella ZAVVISI_TXT espansa",{{"Data Scoperta", type date}}),
+    #"Aggiunta Avv. chiuso in ritardo" = Table.AddColumn(#"Modificato tipo Data Scoperta", "Avv. chiuso in ritardo", each if ([IW29_full.Data chiusura]<>null and [#"IW29_full.FineRich."]<>null) then 
+   if [IW29_full.Data chiusura]>[#"IW29_full.FineRich."] then "Data chiusura avv. > Data fine rich." else ""
+else ""),
+    #"Aggiunta Data chiusura avv. < Data inizio avv." = Table.AddColumn(#"Aggiunta Avv. chiuso in ritardo", "Data chiusura avv. < Data inizio avv.", each if ([IW29_full.Data chiusura]<>null and [#"IW29_full.In. rich."]<>null) then 
+    if [IW29_full.Data chiusura]<[#"IW29_full.In. rich."]      then "Data chiusura avv. < Data inizio avv." else ""
+else ""),
+    #"Aggiunta Data chiusura avv. futura" = Table.AddColumn(#"Aggiunta Data chiusura avv. < Data inizio avv.", "Data chiusura avv. futura", each if [IW29_full.Data chiusura] <> null and [IW29_full.Data chiusura] > Date.From(DateTime.LocalNow()) then "Data Tolto d'opera futura" else ""),
+    #"Aggiunta Ritardo Avv." = Table.AddColumn(#"Aggiunta Data chiusura avv. futura", "Ritardo Avv.", each if ([IW29_full.Data chiusura]<>null and [#"IW29_full.FineRich."]<>null) then 
+   if [IW29_full.Data chiusura]>[#"IW29_full.FineRich."] then "(Ritardo " & Text.From(Duration.Days([IW29_full.Data chiusura]-[#"IW29_full.FineRich."])) & " gg)" else 0
+else 0),
+    #"Merge IK07_full" = Table.NestedJoin(#"Aggiunta Ritardo Avv.", {"Pdm"}, IK07_full, {"Punto di misura"}, "IK07_full", JoinKind.FullOuter),
+    #"Tabella IK07_full espansa" = Table.ExpandTableColumn(#"Merge IK07_full", "IK07_full", {"Autore modifica", "Punto di misura", "Descrizione", "Sede tecnica", "Tipo punto di mis.", "Gruppo codici", "Pos. misura", "Punto mis. inattivo", "Tipo catalogo", "Chiave lingua", "Creato da", "Data creazione", "Data modifica", "Mandante", "N. ogg. punto mis.", "Ind.punto mis. rif.", "Indic. di canc.", "Punto mis. è contat.", "Punto mis. rif.", "Tsto"}, {"IK07_full.Autore modifica", "IK07_full.Punto di misura", "IK07_full.Descrizione", "IK07_full.Sede tecnica", "IK07_full.Tipo punto di mis.", "IK07_full.Gruppo codici", "IK07_full.Pos. misura", "IK07_full.Punto mis. inattivo", "IK07_full.Tipo catalogo", "IK07_full.Chiave lingua", "IK07_full.Creato da", "IK07_full.Data creazione", "IK07_full.Data modifica", "IK07_full.Mandante", "IK07_full.N. ogg. punto mis.", "IK07_full.Ind.punto mis. rif.", "IK07_full.Indic. di canc.", "IK07_full.Punto mis. è contat.", "IK07_full.Punto mis. rif.", "IK07_full.Tsto"}),
+    #"Aggiunta PdM visibile in ZSTMAIA" = Table.AddColumn(#"Tabella IK07_full espansa", "PdM non visibile in ZSTMAIA", each if ([IK07_full.Punto di misura] <> null and [Pdm]=null) then 
+    "PdM non visibile in ZSTMAIA"
+else ""),
+    #"Aggiunta PdM_definitivo" = Table.AddColumn(#"Aggiunta PdM visibile in ZSTMAIA", "PdM_definitivo", each if [Pdm] <> null then [Pdm] else [IK07_full.Punto di misura]),
+    #"Duplicata PdM_definitivo_clone" = Table.DuplicateColumn(#"Aggiunta PdM_definitivo", "PdM_definitivo", "PdM_definitivo_clone"),
+    #"Aggiunta Osservazioni_definitivo" = Table.AddColumn(#"Duplicata PdM_definitivo_clone", "Osservazioni_definitivo", each if ([IK07_full.Punto di misura] <> null and [Pdm]=null) then 
+    [IK07_full.Descrizione]
+else
+    [Osservazioni]),
+    #"Aggiunta Sede_tecnica_definitiva" = Table.AddColumn(#"Aggiunta Osservazioni_definitivo", "Sede_tecnica_definitiva", each if [Tratta] <> null then [Tratta] else 
+if [IW29_full.Sede tecnica]<>null then [IW29_full.Sede tecnica] else [IK07_full.Sede tecnica]),
+    #"Aggiunta  Tolto d'opera_definitivo" = Table.AddColumn(#"Aggiunta Sede_tecnica_definitiva", " Tolto d'opera_definitivo", each if ([IK07_full.Punto di misura] <> null and [Pdm]=null) then 
+    if [IK07_full.Punto mis. inattivo]="X" then "S" else "N"
+else
+    [#"Tolto d'opera"]),
+    #"Aggiunta Anno" = Table.AddColumn(#"Aggiunta  Tolto d'opera_definitivo", "Anno", each if ([Pdm]<>null and [Data Scoperta]<>null) then 
+    Date.Year([Data Scoperta]) 
+else if [IW29_full.Avviso]<>null then 
+    Date.Year([IW29_full.Data avviso]) 
+else 
+    Date.Year([IK07_full.Data creazione])),
+    #"Modificato tipo Anno" = Table.TransformColumnTypes(#"Aggiunta Anno",{{"Anno", Int64.Type}}),
+    #"Aggiunta tratta_definitiva" = Table.AddColumn(#"Modificato tipo Anno", "Caratteri iniziali", each Text.Start([Sede_tecnica_definitiva], 6), type text),
+    #"Rinominate colonne" = Table.RenameColumns(#"Aggiunta tratta_definitiva",{{"Caratteri iniziali", "Tratta_definitiva"}}),
+    #"Aggiunta PdM chiuso in ritardo" = Table.AddColumn(#"Rinominate colonne", "PdM chiuso in ritardo", each if ([#"Data tolto d'opera"]<>null and [#"IW29_full.FineRich."]<>null) then 
+    if ([#"IW29_full.FineRich."] <>null and [#"Data tolto d'opera"]>[#"IW29_full.FineRich."]) then "Data Tolto d'opera > Data fine rich." else "" else ""),
+    #"Aggiunta Data Tolto d'opera < Data scoperta" = Table.AddColumn(#"Aggiunta PdM chiuso in ritardo", "Data Tolto d'opera < Data scoperta", each if ([Data Scoperta] <> null and [#"Data tolto d'opera"] <> null) then 
+if [Data Scoperta]>[#"Data tolto d'opera"] then "Data Tolto d'opera < Data scoperta" else ""
+else ""),
+    #"Aggiunta Data Tolto d'opera futura" = Table.AddColumn(#"Aggiunta Data Tolto d'opera < Data scoperta", "Data Tolto d'opera futura", each if [#"Data tolto d'opera"] <> null and [#"Data tolto d'opera"] > Date.From(DateTime.LocalNow()) then "Data Tolto d'opera futura" else ""),
+    #"Aggiunta Ritardo PdM" = Table.AddColumn(#"Aggiunta Data Tolto d'opera futura", "Ritardo PdM", each if ([#"Data tolto d'opera"]<>null and [#"IW29_full.FineRich."]<>null) then 
+    if ([#"IW29_full.FineRich."] <>null and [#"Data tolto d'opera"]>[#"IW29_full.FineRich."]) then "(Ritardo " & Text.From(Duration.Days([#"Data tolto d'opera"]-[#"IW29_full.FineRich."])) & " gg)" else 0 
+else 0),
+    #"Aggiunta anomalie PdM" = Table.AddColumn(#"Aggiunta Ritardo PdM", "Anomalie PdM", each if [PdM non visibile in ZSTMAIA] <> "" then 1 else if [PdM chiuso in ritardo] <> "" then 1 else if [#"Data Tolto d'opera futura"] <> "" then 1 else if [#"Data Tolto d'opera < Data scoperta"] <> "" then 1 else 0),
+    #"Aggiunta avviso chiuso" = Table.AddColumn(#"Aggiunta anomalie PdM", "Avviso chiuso", each if [#"IW29_full.St.sist."] = null then null else if Text.Contains([#"IW29_full.St.sist."], "MECO") then "S" else "N"),
+    #"Aggiunta Classe prov definitiva" = Table.AddColumn(#"Aggiunta avviso chiuso", "Classe_prov_definitiva", each if ([Classe provvedimento]=null or [Classe provvedimento]="") then "MANCANTE" else [Classe provvedimento]),
+    #"Aggiunta avviso aperto" = Table.AddColumn(#"Aggiunta Classe prov definitiva", "Avviso aperto", each if [#"IW29_full.St.sist."] is null then 0 else if Text.Contains([#"IW29_full.St.sist."], "MECO") then 0 else 1),
+    #"Aggiunta PdM aperto" = Table.AddColumn(#"Aggiunta avviso aperto", "Pdm aperto", each if [#" Tolto d'opera_definitivo"] = "N" then 1 else 0),
+    #"Modificato tipo Pdm aperto avviso aperto" = Table.TransformColumnTypes(#"Aggiunta PdM aperto",{{"Avviso aperto", Int64.Type}, {"Pdm aperto", Int64.Type}}),
+    #"Aggiunta Avviso aperto o Pdm aperto" = Table.AddColumn(#"Modificato tipo Pdm aperto avviso aperto", "Avviso aperto o Pdm aperto", each if ([Avviso aperto]+[Pdm aperto])>0 then 1 else 0),
+    #"Modificato Avviso aperto o Pdm aperto" = Table.TransformColumnTypes(#"Aggiunta Avviso aperto o Pdm aperto",{{"Avviso aperto o Pdm aperto", Int64.Type}}),
+    #"Aggiunta Classificazione stato" = Table.AddColumn(#"Modificato Avviso aperto o Pdm aperto", "Classificazione stato", each (if [Pdm aperto] = 1 then
+    "Pdm aperto"
+else if [Pdm] is null then
+    "Pdm mancante"
+else
+    "Pdm chiuso") 
+& " - " &
+(if [Avviso aperto] = 1 then
+     "Avv. aperto"
+else if [#"IW29_full.Avviso"] is null then
+     "Avv. mancante"
+else
+     "Avv. chiuso")),
+    #"Aggiunta Statos scadenza" = Table.AddColumn(#"Aggiunta Classificazione stato", "Stato scadenza", each if [Avviso aperto o Pdm aperto]=0 then
+   "COMPLETATO" else
+if [IW29_full.Avviso] is null then
+   "MANCANTE" 
+else if [#"IW29_full.FineRich."]<Date.From(DateTime.LocalNow()) then
+   "SCADUTO" 
+else if [#"IW29_full.FineRich."]<Date.AddDays(Date.From(DateTime.LocalNow()), 10) then 
+   "SCAD.<10GG" 
+else if [#"IW29_full.FineRich."]<Date.AddDays(Date.From(DateTime.LocalNow()), 30) then 
+   "SCAD.<30GG" else if  [#"IW29_full.FineRich."]<Date.AddDays(Date.From(DateTime.LocalNow()), 60) then
+   "SCAD.<60GG" 
+else 
+   "SCAD.>60GG"),
+    #"Aggiunta Cod. stato scadenza" = Table.AddColumn(#"Aggiunta Statos scadenza", "Cod. stato scadenza", each if [Avviso aperto o Pdm aperto]=0 then
+   "00" else
+if [IW29_full.Avviso] is null then
+   "01" 
+else if [#"IW29_full.FineRich."]<Date.From(DateTime.LocalNow()) then
+   "02" 
+else if [#"IW29_full.FineRich."]<Date.AddDays(Date.From(DateTime.LocalNow()), 10) then 
+   "03" 
+else if [#"IW29_full.FineRich."]<Date.AddDays(Date.From(DateTime.LocalNow()), 30) then 
+   "04" else if  [#"IW29_full.FineRich."]<Date.AddDays(Date.From(DateTime.LocalNow()), 60) then
+   "05" 
+else 
+   "06"),
+    #"Aggiunta Network/OdL agganciato" = Table.AddColumn(#"Aggiunta Cod. stato scadenza", "Network/OdL agganciato", each if [IW29_full.Avviso]<>null then 
+   if [Avviso chiuso]="S" then 
+      if([IW29_full.Network]<>null or ([IW29_full.Ordine]<>"" and [IW29_full.Ordine]<>"")) then "S" else "N"
+      else "-" 
+else "-"),
+    #"Aggiunta chiave (Pdm o avviso)" = Table.AddColumn(#"Aggiunta Network/OdL agganciato", "Chiave (PdM o Avviso)", each if [PdM_definitivo]<>null then [PdM_definitivo] else [IW29_full.Avviso]),
+    #"Aggiunta presenza pdm e avviso" = Table.AddColumn(#"Aggiunta chiave (Pdm o avviso)", "Presenza PdM e Avviso", each if [PdM_definitivo]<>null then
+   if [IW29_full.Avviso]<>null then "Pdm con Avviso"
+   else "Pdm senza avviso"
+else
+   if [IW29_full.Avviso]<>null then "Avviso senza Pdm"
+   else "No avviso no Pdm"),
+    #"Aggiungi avviso clone" = Table.DuplicateColumn(#"Aggiunta presenza pdm e avviso", "IW29_full.Avviso", "IW29_full.Avviso - Copia"),
+    #"Rinominate colonne1" = Table.RenameColumns(#"Aggiungi avviso clone",{{"IW29_full.Avviso - Copia", "IW29_full.Avviso_clone"}})
+in
+    #"Rinominate colonne1"

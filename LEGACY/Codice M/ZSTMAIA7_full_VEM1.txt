@@ -1,0 +1,13 @@
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\ZSTMAIA7_full_VEM1.xlsx"), null, true),
+    Data_Sheet = Origine{[Item="Data",Kind="Sheet"]}[Data],
+    #"Modificato tipo" = Table.TransformColumnTypes(Data_Sheet,{{"Column1", type text}, {"Column2", type text}, {"Column3", type text}, {"Column4", type text}, {"Column5", type text}, {"Column6", type text}, {"Column7", type text}, {"Column8", type any}, {"Column9", type any}, {"Column10", type text}, {"Column11", type text}, {"Column12", type text}, {"Column13", type text}, {"Column14", type text}, {"Column15", Int64.Type}, {"Column16", type text}, {"Column17", type text}, {"Column18", type date}, {"Column19", type text}, {"Column20", type text}, {"Column21", type text}, {"Column22", type text}, {"Column23", type any}}),
+    #"Rimosse prime righe" = Table.Skip(#"Modificato tipo",15),
+    #"Ultime righe rimosse" = Table.RemoveLastN(#"Rimosse prime righe",18),
+    #"Rimosse colonne" = Table.RemoveColumns(#"Ultime righe rimosse",{"Column2", "Column5", "Column6", "Column8", "Column9", "Column12", "Column13", "Column15", "Column23"}),
+    #"Righe vuote rimosse" = Table.SelectRows(#"Rimosse colonne", each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    #"Filtrate righe" = Table.SelectRows(#"Righe vuote rimosse", each not Text.Contains([Column20], "N.PUNTO DI") and not Text.Contains([Column20], "MISURA")),
+    #"Rinominate colonne" = Table.RenameColumns(#"Filtrate righe",{{"Column1", "Data scoperta"}, {"Column3", "Cod. linea"}, {"Column4", "Cod. SeTe"}, {"Column7", "Bin."}, {"Column10", "Fila"}, {"Column11", "km linea"}, {"Column14", "Tipo difetto"}, {"Column16", "Classe porvv."}, {"Column17", "Tolto d'opera"}, {"Column18", "Data tolto d'opera"}, {"Column19", "Centro di lavoro"}, {"Column20", "Pdm"}, {"Column21", "N. doc. di misura"}, {"Column22", "Avviso"}}),
+    #"Modificato tipo1" = Table.TransformColumnTypes(#"Rinominate colonne",{{"Data scoperta", type date}, {"Data tolto d'opera", type date}})
+in
+    #"Modificato tipo1"

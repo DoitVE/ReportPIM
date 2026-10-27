@@ -1,0 +1,8 @@
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\IW39_STATO_ODL.XLSX"), null, true),
+    Sheet1_Sheet = Origine{[Item="Sheet1",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Centro lavoro resp.", type text}, {"Divisione", type text}, {"Ordine", Int64.Type}, {"Tipo di ordine", Int64.Type}, {"Data inizio cardine", type date}, {"Tsto br.", type text}, {"Stato sistema", type text}, {"Costi tot. effettivi", type number}, {"Costi totali pian.", type number}, {"Data fine cardine", type date}, {"Data inizio eff.", type date}, {"Fine schedulata", type date}, {"Inizio schedulato", type date}, {"Sede tecnica", type text}, {"Tot. pianificato", type number}, {"Totale (effettivo)", type number}}),
+    #"Aggiunta colonna personalizzata" = Table.AddColumn(#"Modificato tipo", "Stato OdL", each if Text.PositionOf([Stato sistema], "TECC")>-1 then "Chiuso" else if Text.PositionOf([Stato sistema], "RIL")>-1 then "Rilasciato" else if Text.PositionOf([Stato sistema], "APER")>-1 then "Aperto" else  if Text.PositionOf([Stato sistema], "CONC")>-1 then "Concluso" else "n.d.")
+in
+    #"Aggiunta colonna personalizzata"

@@ -1,0 +1,23 @@
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\ZSTMAIA1_full.xlsx"), null, true),
+    Data_Sheet = Origine{[Item="Data",Kind="Sheet"]}[Data],
+    #"Rimosse prime righe" = Table.Skip(Data_Sheet,59),
+    #"Ultime righe rimosse" = Table.RemoveLastN(#"Rimosse prime righe",20),
+    #"Filtrate righe" = Table.SelectRows(#"Ultime righe rimosse", each [Column1] <> "COD." and [Column1] <> "TRATTA" and [Column1] <> ""),
+    #"Rinominate colonne" = Table.RenameColumns(#"Filtrate righe",{{"Column1", "Tratta"}, {"Column3", "Dev."}, {"Column5", "Bin."}, {"Column7", "Fila"}, {"Column9", "Km linea"}, {"Column13", "Pdm"}}),
+    #"Rimosse colonne" = Table.RemoveColumns(#"Rinominate colonne",{"Column2", "Column4", "Column6", "Column8", "Column10", "Column11", "Column12", "Column14"}),
+    #"Rinominate colonne1" = Table.RenameColumns(#"Rimosse colonne",{{"Column15", "Tipo difetto"}}),
+    #"Rimosse colonne1" = Table.RemoveColumns(#"Rinominate colonne1",{"Column16"}),
+    #"Rinominate colonne2" = Table.RenameColumns(#"Rimosse colonne1",{{"Column18", "Classe provvedimento"}}),
+    #"Rimosse colonne2" = Table.RemoveColumns(#"Rinominate colonne2",{"Column19", "Column20"}),
+    #"Rinominate colonne3" = Table.RenameColumns(#"Rimosse colonne2",{{"Column21", "Val. (%/mm)"}}),
+    #"Rimosse colonne3" = Table.RemoveColumns(#"Rinominate colonne3",{"Column22"}),
+    #"Rinominate colonne4" = Table.RenameColumns(#"Rimosse colonne3",{{"Column23", "Prof. Dif."}, {"Column24", "Pos. Dif"}, {"Column25", "Data Scoperta"}}),
+    #"Rinominate colonne5" = Table.RenameColumns(#"Rinominate colonne4",{{"Column26", "Tolto d'opera"}, {"Column27", "Data tolto d'opera"}, {"Column28", "Tipo Arm."}, {"Column29", "Osservazioni"}, {"Column30", "Data Agg."}}),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Rinominate colonne5",{{"Data tolto d'opera", type date}}),
+    #"Modificato tipo2" = Table.TransformColumnTypes(#"Modificato tipo",{{"Data Agg.", type date}}),
+    #"Rimosse colonne4" = Table.RemoveColumns(#"Modificato tipo2",{"Column31"}),
+    #"Filtrate righe1" = Table.SelectRows(#"Rimosse colonne4", each true),
+    #"Rimosse colonne5" = Table.RemoveColumns(#"Filtrate righe1",{"Column17"})
+in
+    #"Rimosse colonne5"

@@ -1,0 +1,4 @@
+let
+    Origine = Table.Combine({IK07_INATTIVO, IK07_ATTIVO})
+in
+    Origine

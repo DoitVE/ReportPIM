@@ -1,0 +1,7 @@
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\GPS.xlsx"), null, true),
+    Sheet1_Sheet = Origine{[Item="Sheet1",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Sede tecnica", type text}, {"Definizione della sede tecnica", type text}, {"Divis. ubic.", type text}, {"Stato sistema", type text}, {"Stato utente", type text}, {"Km. Inizio", type number}, {"Km. Fine", type number}, {"Data modifica", type any}, {"Autore modifica", type text}, {"Centro di lavoro", type text}, {"Località", type text}, {"In funz. dal", type any}, {"Data creazione", type any}, {"Divisione pian.", type text}, {"Lunghezza", Int64.Type}, {"Sede tecnica superiore", type text}, {"Sede tecnica di riferimento", type text}, {"Latitudine Fine", type number}, {"Latitudine Inizio", type number}, {"Longitudine Fine", type number}, {"Altitudine Fine", type number}, {"Altitudine Inizio", type number}, {"Longitudine Inizio", type number}})
+in
+    #"Modificato tipo"

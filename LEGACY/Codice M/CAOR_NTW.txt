@@ -1,0 +1,10 @@
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\CAOR_NTW.xlsx"), null, true),
+    CAOR_NTW_Sheet = Origine{[Item="CAOR_NTW",Kind="Sheet"]}[Data],
+    #"Modificato tipo1" = Table.TransformColumnTypes(CAOR_NTW_Sheet,{{"Column11", type text}, {"Column10", type text}}),
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(#"Modificato tipo1", [PromoteAllScalars=true]),
+    #"Aggiunta colonna personalizzata" = Table.AddColumn(#"Intestazioni alzate di livello", "Networl-C. lav.", each if [Network] = "n.d." then "n.d." else [Network] & "-" & [#"C. lav."]),
+    #"Raggruppate righe" = Table.Group(#"Aggiunta colonna personalizzata", {"Networl-C. lav."}, {{"Data prima consuntivazione", each List.Min([Data]), type text}, {"Data ultima consuntivazione", each List.Max([Data]), type text}, {"Ore consuntivate", each List.Sum([#"        Ore"]), type number}}),
+    #"Rinominate colonne" = Table.RenameColumns(#"Raggruppate righe",{{"Ore consuntivate", "Ore cons. su Ntw"}, {"Data prima consuntivazione", "Data prima cons. su NTW"}, {"Data ultima consuntivazione", "Data ultima cons. su NTW"}})
+in
+    #"Rinominate colonne"

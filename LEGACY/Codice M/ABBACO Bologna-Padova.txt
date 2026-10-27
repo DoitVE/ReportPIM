@@ -1,0 +1,14 @@
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\ABBA.CO.AGGIORNATO-RPC +++USARE QUESTO+++.xlsx"), null, true),
+    #"Bologna-Padova_Sheet" = Origine{[Item="Bologna-Padova",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(#"Bologna-Padova_Sheet", [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Column1", type text}, {"Column2", type any}, {"Column3", type text}, {"Column4", type text}, {"Column5", type text}, {"Direzione Operativa Infrastratture Territoriale VE", type text}, {"Column7", type text}, {"Column8", type text}, {"Column9", type text}, {"Column10", type any}, {"Column11", type any}, {"Column12", type text}, {"Column13", type text}, {"Column14", type text}, {"Column15", type text}, {"Column16", type any}, {"Column17", type text}, {"Column18", type text}, {"Column19", type text}}),
+    #"Rimosse prime righe" = Table.Skip(#"Modificato tipo",7),
+    #"Intestazioni alzate di livello1" = Table.PromoteHeaders(#"Rimosse prime righe", [PromoteAllScalars=true]),
+    #"Modificato tipo1" = Table.TransformColumnTypes(#"Intestazioni alzate di livello1",{{"Codice Tratta INRETE", type text}, {"Tratta (descrizione)", type text}, {"Binario (P/D/L)", type text}, {"Inizio", type text}, {"Fine", type text}, {"chiave_RL", type text}, {"rid_vel (km/h)", type text}, {"Motivo", type text}, {"Titolare del rallentamento (matr.)", type text}, {"Data inizio", type date}, {"Ora inizio", type any}, {"Avviso Avaria", type text}, {"EA", type text}, {"CODICE ABBATTIMENTO ", type text}, {"UM", type text}, {"Pianificazione", type date}, {"Data fine", type text}, {"Ora fine", type text}}),
+    #"Righe vuote rimosse" = Table.SelectRows(#"Modificato tipo1", each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    #"Rimosse colonne" = Table.RemoveColumns(#"Righe vuote rimosse",{"Column19"}),
+    #"Righe vuote rimosse1" = Table.SelectRows(#"Rimosse colonne", each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    #"Aggiunta colonna personalizzata" = Table.AddColumn(#"Righe vuote rimosse1", "Linea", each "Bologna-Padova")
+in
+    #"Aggiunta colonna personalizzata"

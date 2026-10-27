@@ -236,18 +236,16 @@ export const PageDrillV5: React.FC<PageDrillV5Props> = ({
       <PbiBackButton x={15} y={14} size={32} onClick={onBack} title="Torna alla pagina precedente" />
 
       {/* Logo RFI */}
-      <PbiBox x={52} y={10} w={95} h={42} z={33000}>
+      <PbiBox x={52} y={8} w={95} h={36} z={33000}>
         <img
           src="/assets/logo_ufficiale.png"
           alt="RFI"
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-
-      {/* Reset Filtri */}
       <PbiButton
-        x={152} y={12} w={82} h={30} z={44000}
-        label="Reset Filtri" sizePt={8.5} onClick={handleResetFilters}
+        x={52} y={48} w={85} h={22} z={44000}
+        label="Reset Filtri" sizePt={8} onClick={handleResetFilters}
       />
 
       {/* Slicer Cerca Avviso */}

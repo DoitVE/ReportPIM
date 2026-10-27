@@ -398,33 +398,31 @@ export const PageDashboardV5: React.FC<PageDashboardV5Props> = ({
       <PbiBackButton x={15} y={14} size={32} onClick={onBack} title="Torna indietro" />
 
       {/* Logo RFI */}
-      <PbiBox x={55} y={10} w={175} h={46} z={11000}>
+      <PbiBox x={55} y={8} w={140} h={36} z={11000}>
         <img
           src="/assets/logo_ufficiale.png"
           alt="RFI"
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
+      <PbiButton x={55} y={48} w={85} h={22} z={22000} label="Reset Filtri" sizePt={8} onClick={handleResetFilters} />
 
       {/* Titoli e Data aggiornamento */}
-      <PbiText x={18} y={70} w={280} h={26} z={5000} text="Difetti di binario - DOIT VE" sizePt={16} bold color={RED} />
-      <PbiText x={18} y={98} w={200} h={22} z={14000} text="Dashboard V5" sizePt={13} bold color={PBI_COLORS.textLight} />
+      <PbiText x={18} y={74} w={280} h={26} z={5000} text="Difetti di binario - DOIT VE" sizePt={16} bold color={RED} />
+      <PbiText x={18} y={100} w={200} h={22} z={14000} text="Dashboard V5" sizePt={13} bold color={PBI_COLORS.textLight} />
       <PbiText x={18} y={124} w={55} h={18} z={12000} text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} vAlign="middle" />
       <PbiText x={75} y={124} w={160} h={18} z={8000} text={dataAggiornamento} sizePt={10} color={PBI_COLORS.textLight} vAlign="middle" />
-
-      {/* Reset Filtri */}
-      <PbiButton x={315} y={10} w={95} h={28} z={22000} label="Reset Filtri" sizePt={8.5} onClick={handleResetFilters} />
 
       {/* ================= Slicer Superiori ================= */}
       {/* Colonna 1: Cerca PdM / Cerca Avviso */}
       <PbiListSlicer
-        x={315} y={44} w={115} h={68} z={17000}
+        x={315} y={10} w={115} h={86} z={17000}
         title="Cerca PdM" options={pdmOptions} value={selPdm} onToggle={(v) => toggle(setSelPdm, v)}
         searchable itemColor={PBI_COLORS.textLight} itemSizePt={7.5}
         headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={9}
       />
       <PbiListSlicer
-        x={315} y={118} w={115} h={68} z={13000}
+        x={315} y={102} w={115} h={86} z={13000}
         title="Cerca Avviso" options={avvisiList} value={selAvviso} onToggle={(v) => toggle(setSelAvviso, v)}
         searchable itemColor={PBI_COLORS.textLight} itemSizePt={7.5}
         headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={9}

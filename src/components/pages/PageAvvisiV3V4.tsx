@@ -280,10 +280,16 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
       maxZoom: 16,
     }).addTo(map);
 
+    let trackBounds: L.LatLngBounds | null = null;
     try {
-      L.geoJSON(rfiTracksGeoJson as any, {
+      const geoLayer = L.geoJSON(rfiTracksGeoJson as any, {
         style: () => ({ color: PBI_COLORS.textLight, weight: 2, opacity: 0.85 }),
       }).addTo(map);
+      const bounds = geoLayer.getBounds();
+      if (bounds.isValid()) {
+        trackBounds = bounds;
+        map.fitBounds(bounds, { padding: [12, 12] });
+      }
     } catch (e) {
       console.warn('GeoJSON render error:', e);
     }
@@ -292,7 +298,12 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
     markersLayerRef.current = markers;
     mapInstanceRef.current = map;
 
-    setTimeout(() => map.invalidateSize(), 150);
+    setTimeout(() => {
+      map.invalidateSize();
+      if (trackBounds && trackBounds.isValid()) {
+        map.fitBounds(trackBounds, { padding: [12, 12] });
+      }
+    }, 200);
   }, []);
 
   // Aggiornamento bubble (CountNonNull(Avviso) per località, fill #2F9292)
@@ -340,23 +351,24 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
       <PbiShape x={358} y={282} w={137} h={190} z={0} fill={PBI_COLORS.card} radius={6} />
 
       {/* ================= Intestazione ================= */}
-      <PbiBox x={15} y={8} w={150} h={48} z={23000}>
+      <PbiBox x={15} y={8} w={140} h={38} z={23000}>
         <img
           src="/assets/logo_ufficiale.png"
           alt="RFI"
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiText x={180} y={8} w={340} h={26} z={2000}
-        text="Difetti di livello e scartamento - DOIT VE" sizePt={16} bold color={RED} />
-      <PbiText x={180} y={34} w={95} h={20} z={25000}
-        text="Avvisi V3 e V4" sizePt={12} bold color={PBI_COLORS.textLight} />
-      <PbiText x={278} y={35} w={45} h={18} z={24000}
-        text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
-      <PbiText x={325} y={35} w={100} h={18} z={22000}
-        text={dataAggiornamento} sizePt={9.5} color={PBI_COLORS.textLight} vAlign="middle" />
-      <PbiButton x={430} y={32} w={65} h={24} z={30000}
+      <PbiButton x={15} y={48} w={85} h={22} z={30000}
         label="Reset Filtri" sizePt={8} onClick={handleResetFilters} />
+
+      <PbiText x={170} y={8} w={330} h={26} z={2000}
+        text="Difetti di livello e scartamento - DOIT VE" sizePt={16} bold color={RED} />
+      <PbiText x={170} y={34} w={95} h={20} z={25000}
+        text="Avvisi V3 e V4" sizePt={12} bold color={PBI_COLORS.textLight} />
+      <PbiText x={270} y={35} w={45} h={18} z={24000}
+        text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
+      <PbiText x={318} y={35} w={100} h={18} z={22000}
+        text={dataAggiornamento} sizePt={9.5} color={PBI_COLORS.textLight} vAlign="middle" />
 
       {/* ================= Etichette dei filtri ================= */}
       <PbiText x={22} y={72} w={175} h={16} z={2000}

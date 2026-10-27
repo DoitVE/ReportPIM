@@ -330,10 +330,16 @@ export const PageFrequenzaV3V4: React.FC<PageFrequenzaV3V4Props> = ({
       maxZoom: 16,
     }).addTo(map);
 
+    let trackBounds: L.LatLngBounds | null = null;
     try {
-      L.geoJSON(rfiTracksGeoJson as any, {
+      const geoLayer = L.geoJSON(rfiTracksGeoJson as any, {
         style: () => ({ color: PBI_COLORS.textLight, weight: 2, opacity: 0.85 }),
       }).addTo(map);
+      const bounds = geoLayer.getBounds();
+      if (bounds.isValid()) {
+        trackBounds = bounds;
+        map.fitBounds(bounds, { padding: [12, 12] });
+      }
     } catch (e) {
       console.warn('GeoJSON render error:', e);
     }
@@ -342,7 +348,12 @@ export const PageFrequenzaV3V4: React.FC<PageFrequenzaV3V4Props> = ({
     markersLayerRef.current = markers;
     mapInstanceRef.current = map;
 
-    setTimeout(() => map.invalidateSize(), 150);
+    setTimeout(() => {
+      map.invalidateSize();
+      if (trackBounds && trackBounds.isValid()) {
+        map.fitBounds(trackBounds, { padding: [12, 12] });
+      }
+    }, 200);
   }, []);
 
   // bubbleLayer: fill #99BD3C, stroke #4E601E, raggio 6..14
@@ -391,24 +402,25 @@ export const PageFrequenzaV3V4: React.FC<PageFrequenzaV3V4Props> = ({
       <PbiShape x={308} y={282} w={187} h={125} z={0} fill={PBI_COLORS.card} radius={6} />
 
       {/* ================= Intestazione ================= */}
-      <PbiBox x={15} y={8} w={150} h={48} z={26000}>
+      <PbiBox x={15} y={8} w={140} h={38} z={26000}>
         <img
           src="/assets/logo_ufficiale.png"
           alt="RFI"
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiText x={180} y={8} w={340} h={26} z={2000}
+      <PbiButton x={15} y={48} w={85} h={22} z={33000} label="Reset Filtri" sizePt={8} onClick={handleResetFilters} />
+
+      <PbiText x={170} y={8} w={330} h={26} z={2000}
         text="Difetti di livello e scartamento - DOIT VE" sizePt={16} bold color={ACCENT} />
-      <PbiText x={180} y={34} w={115} h={20} z={28000}
+      <PbiText x={170} y={34} w={115} h={20} z={28000}
         text="Frequenza V3 e V4" sizePt={12} bold color={PBI_COLORS.textLight} />
-      <PbiText x={298} y={35} w={45} h={18} z={27000}
+      <PbiText x={290} y={35} w={45} h={18} z={27000}
         text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
-      <PbiText x={345} y={35} w={100} h={18} z={25000}
+      <PbiText x={338} y={35} w={100} h={18} z={25000}
         text={dataAggiornamento} sizePt={9.5} color={PBI_COLORS.textLight} vAlign="middle" />
 
       {/* ================= Bottoni di navigazione ================= */}
-      <PbiButton x={450} y={32} w={65} h={24} z={33000} label="Reset Filtri" sizePt={8} onClick={handleResetFilters} />
       <PbiButton x={1150} y={672} w={110} h={34} z={41000} variant="light"
         label="Drill V3 V4" sizePt={9} disabled={!selectedRow} onClick={() => selectedRow && onNavigateToDrill(selectedRow)} />
 

@@ -3,6 +3,7 @@ import { Iw67Item, Avviso, PowerBiSectionId } from '../../types';
 import { RotateCcw, ArrowRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import L from 'leaflet';
+import { rfiTracksGeoJson } from '../../data/gpsService';
 
 interface PageAnalisiFrequenzaProps {
   iw67: Iw67Item[];
@@ -83,8 +84,30 @@ export const PageAnalisiFrequenza: React.FC<PageAnalisiFrequenzaProps> = ({
         maxZoom: 16,
         attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
       }).addTo(map);
+
+      let trackBounds: L.LatLngBounds | null = null;
+      try {
+        const geoLayer = L.geoJSON(rfiTracksGeoJson as any, {
+          style: () => ({ color: '#cbd5e1', weight: 1.8, opacity: 0.8 }),
+        }).addTo(map);
+        const bounds = geoLayer.getBounds();
+        if (bounds.isValid()) {
+          trackBounds = bounds;
+          map.fitBounds(bounds, { padding: [12, 12] });
+        }
+      } catch (e) {
+        console.warn('GeoJSON render error:', e);
+      }
+
       markersLayerRef.current = L.layerGroup().addTo(map);
       mapInstanceRef.current = map;
+
+      setTimeout(() => {
+        map.invalidateSize();
+        if (trackBounds && trackBounds.isValid()) {
+          map.fitBounds(trackBounds, { padding: [12, 12] });
+        }
+      }, 200);
     }
   }, []);
 

@@ -136,10 +136,16 @@ export const PageAbbaco: React.FC<PageAbbacoProps> = ({
       maxZoom: 16,
     }).addTo(map);
 
+    let trackBounds: L.LatLngBounds | null = null;
     try {
-      L.geoJSON(rfiTracksGeoJson as any, {
+      const geoLayer = L.geoJSON(rfiTracksGeoJson as any, {
         style: () => ({ color: PBI_COLORS.textLight, weight: 2, opacity: 0.85 }),
       }).addTo(map);
+      const bounds = geoLayer.getBounds();
+      if (bounds.isValid()) {
+        trackBounds = bounds;
+        map.fitBounds(bounds, { padding: [12, 12] });
+      }
     } catch (e) {
       console.warn('GeoJSON render error:', e);
     }
@@ -148,7 +154,12 @@ export const PageAbbaco: React.FC<PageAbbacoProps> = ({
     markersLayerRef.current = markers;
     mapInstanceRef.current = map;
 
-    setTimeout(() => map.invalidateSize(), 150);
+    setTimeout(() => {
+      map.invalidateSize();
+      if (trackBounds && trackBounds.isValid()) {
+        map.fitBounds(trackBounds, { padding: [12, 12] });
+      }
+    }, 200);
   }, []);
 
   // Aggiornamento marker (bubbleLayer: fill #F5C26B, raggio 6-14 in base al conteggio)
@@ -193,25 +204,24 @@ export const PageAbbaco: React.FC<PageAbbacoProps> = ({
       <PbiShape x={15} y={282} w={476} h={190} z={0} fill={PBI_COLORS.panel} radius={6} />
 
       {/* ================= Intestazione ================= */}
-      <PbiBox x={15} y={8} w={150} h={48} z={16000}>
+      <PbiBox x={15} y={8} w={140} h={38} z={16000}>
         <img
           src="/assets/logo_ufficiale.png"
           alt="RFI"
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiText x={180} y={8} w={340} h={26} z={14000}
-        text="Abbattimento Codici - DOIT VE" sizePt={16} bold color={RED} />
-      <PbiText x={180} y={34} w={75} h={20} z={18000}
-        text="ABBA.CO" sizePt={12} bold color={PBI_COLORS.textLight} />
-      <PbiText x={258} y={35} w={45} h={18} z={17000}
-        text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
-      <PbiText x={306} y={35} w={105} h={18} z={15000}
-        text={dataAggiornamento} sizePt={9.5} color={PBI_COLORS.textLight} vAlign="middle" />
-
-      {/* ================= Reset Filtri ================= */}
-      <PbiButton x={415} y={32} w={65} h={24} z={23000}
+      <PbiButton x={15} y={48} w={85} h={22} z={23000}
         label="Reset Filtri" sizePt={8} onClick={handleResetFilters} />
+
+      <PbiText x={170} y={8} w={330} h={26} z={14000}
+        text="Abbattimento Codici - DOIT VE" sizePt={16} bold color={RED} />
+      <PbiText x={170} y={34} w={75} h={20} z={18000}
+        text="ABBA.CO" sizePt={12} bold color={PBI_COLORS.textLight} />
+      <PbiText x={250} y={35} w={45} h={18} z={17000}
+        text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
+      <PbiText x={298} y={35} w={105} h={18} z={15000}
+        text={dataAggiornamento} sizePt={9.5} color={PBI_COLORS.textLight} vAlign="middle" />
 
       {/* ================= Etichette dei filtri ================= */}
       <PbiText x={22} y={72} w={85} h={16} z={9000}

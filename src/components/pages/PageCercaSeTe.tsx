@@ -237,17 +237,15 @@ export const PageCercaSeTe: React.FC<PageCercaSeTeProps> = ({
       {/* ================= Header & Navigazione ================= */}
       <PbiBackButton x={15} y={14} size={32} onClick={onBack} title="Torna alla pagina precedente" />
 
-      <PbiBox x={52} y={10} w={150} h={45} z={8000}>
+      <PbiBox x={55} y={8} w={130} h={36} z={8000}>
         <img src="/assets/logo_ufficiale.png" alt="RFI" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }} />
       </PbiBox>
+      <PbiButton x={55} y={48} w={85} h={22} z={20000} label="Reset Filtri" sizePt={8} onClick={handleResetFilters} />
 
-      <PbiText x={215} y={8} w={250} h={26} z={0} text="Difetti di binario - DOIT VE" sizePt={16} bold color={RED} />
-      <PbiText x={215} y={34} w={160} h={22} z={11000} text="Cerca per SeTe V5" sizePt={13} bold color={PBI_COLORS.textLight} />
-      <PbiText x={215} y={56} w={48} h={18} z={9000} text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} vAlign="middle" />
-      <PbiText x={265} y={56} w={130} h={18} z={5000} text={dataAggiornamento} sizePt={10} color={PBI_COLORS.textLight} vAlign="middle" />
-
-      {/* Reset Filtri */}
-      <PbiButton x={380} y={12} w={82} h={30} z={20000} label="Reset Filtri" sizePt={8.5} onClick={handleResetFilters} />
+      <PbiText x={195} y={8} w={270} h={26} z={0} text="Difetti di binario - DOIT VE" sizePt={16} bold color={RED} />
+      <PbiText x={195} y={34} w={160} h={22} z={11000} text="Cerca per SeTe V5" sizePt={13} bold color={PBI_COLORS.textLight} />
+      <PbiText x={195} y={56} w={48} h={18} z={9000} text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} vAlign="middle" />
+      <PbiText x={245} y={56} w={140} h={18} z={5000} text={dataAggiornamento} sizePt={10} color={PBI_COLORS.textLight} vAlign="middle" />
 
       {/* ================= Slicer Superiori (y=10, h=125 per mostrare più sedi tecniche) ================= */}
       <PbiListSlicer

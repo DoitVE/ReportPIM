@@ -203,10 +203,16 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
       maxZoom: 16,
     }).addTo(map);
 
+    let trackBounds: L.LatLngBounds | null = null;
     try {
-      L.geoJSON(rfiTracksGeoJson as any, {
+      const geoLayer = L.geoJSON(rfiTracksGeoJson as any, {
         style: () => ({ color: PBI_COLORS.textLight, weight: 2, opacity: 0.85 }),
       }).addTo(map);
+      const bounds = geoLayer.getBounds();
+      if (bounds.isValid()) {
+        trackBounds = bounds;
+        map.fitBounds(bounds, { padding: [12, 12] });
+      }
     } catch (e) {
       console.warn('GeoJSON render error:', e);
     }
@@ -215,7 +221,12 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
     markersLayerRef.current = markers;
     mapInstanceRef.current = map;
 
-    setTimeout(() => map.invalidateSize(), 150);
+    setTimeout(() => {
+      map.invalidateSize();
+      if (trackBounds && trackBounds.isValid()) {
+        map.fitBounds(trackBounds, { padding: [12, 12] });
+      }
+    }, 200);
   }, []);
 
   // Aggiornamento marker (bubbleLayer: fill #F26D6D, raggio da 6 a 14)
@@ -254,97 +265,100 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
 
   return (
     <PbiCanvas>
-      {/* ---------------- Sfondi ---------------- */}
-      <PbiShape x={640} y={0} w={640} h={453.63636363636363} z={10} fill="#000000" radius={2} />
-      <PbiShape x={0} y={479.09090909090907} w={1280} h={240.90909090909088} z={10} fill={PBI_COLORS.band} radius={5} />
+      {/* ---------------- Sfondi e pannelli ---------------- */}
+      <PbiShape x={15} y={66} w={110} h={68} z={0} fill={PBI_COLORS.card} radius={6} />
+      <PbiShape x={132} y={66} w={220} h={68} z={0} fill={PBI_COLORS.card} radius={6} />
+      <PbiShape x={360} y={66} w={135} h={68} z={0} fill={PBI_COLORS.panel} radius={6} />
 
-      {/* Pannelli dei filtri */}
-      <PbiShape x={0} y={65.6689342403628} w={169.04761904761904} h={85.714285714285708} z={20} fill={PBI_COLORS.card} radius={8} />
-      <PbiShape x={0} y={142} w={650} h={85} z={20} fill={PBI_COLORS.card} radius={8} />
-      <PbiShape x={158} y={66} w={299} h={85} z={20} fill={PBI_COLORS.card} radius={8} />
-      <PbiShape x={0} y={216.15384615384616} w={650} h={90} z={20} fill={PBI_COLORS.card} radius={8} stroke={PBI_COLORS.tileBorder} strokeWidth={1} />
+      <PbiShape x={15} y={140} w={480} h={64} z={0} fill={PBI_COLORS.card} radius={6} />
+      <PbiShape x={15} y={210} w={480} h={64} z={0} fill={PBI_COLORS.card} radius={6} />
 
-      {/* Pannelli contenuto */}
-      <PbiShape x={0} y={296.15384615384613} w={210.76923076923077} h={193.07692307692307} z={21} fill={PBI_COLORS.card} radius={5} />
-      <PbiShape x={201} y={296} w={256} h={193} z={21} fill={PBI_COLORS.panel} radius={5} />
-      <PbiShape x={447} y={296} w={202} h={193} z={21} fill={PBI_COLORS.card} radius={5} />
-      <PbiShape x={447} y={66} w={203} h={86} z={21} fill={PBI_COLORS.panel} radius={7} />
+      <PbiShape x={15} y={282} w={145} h={190} z={0} fill={PBI_COLORS.card} radius={6} />
+      <PbiShape x={168} y={282} w={160} h={190} z={0} fill={PBI_COLORS.panel} radius={6} />
+      <PbiShape x={336} y={282} w={159} h={152} z={0} fill={PBI_COLORS.card} radius={6} />
 
       {/* ---------------- Intestazione ---------------- */}
-      <PbiBox x={10} y={4} w={200} h={58} z={18000}>
+      <PbiBox x={15} y={8} w={140} h={38} z={23000}>
         <img
           src="/assets/logo_ufficiale.png"
           alt="RFI"
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiText x={220} y={4} w={380} h={28} z={16000}
-        text="Difetti di binario - DOIT VE" sizePt={20} bold color={PBI_COLORS.accent} />
-      <PbiText x={220} y={34} w={90} h={25} z={20000} text="Avvisi V5" sizePt={15} bold color={PBI_COLORS.textLight} />
-      <PbiText x={315} y={33} w={55} h={26} z={19000} text="Dati al:" sizePt={11}
+      <PbiButton x={15} y={48} w={85} h={22} z={25000} label="Reset Filtri" sizePt={8} onClick={handleResetFilters} />
+
+      <PbiText x={170} y={8} w={325} h={26} z={16000}
+        text="Difetti di binario - DOIT VE" sizePt={16} bold color={PBI_COLORS.accent} />
+      <PbiText x={170} y={34} w={80} h={20} z={20000} text="Avvisi V5" sizePt={12} bold color={PBI_COLORS.textLight} />
+      <PbiText x={255} y={35} w={45} h={18} z={19000} text="Dati al:" sizePt={9}
         color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
-      <PbiText x={375} y={33} w={150} h={26} z={17000} text={dataAggiornamento} sizePt={11}
+      <PbiText x={305} y={35} w={140} h={18} z={17000} text={dataAggiornamento} sizePt={9.5}
         color={PBI_COLORS.textLight} vAlign="middle" />
-      <PbiButton x={545} y={26} w={95} h={34} z={25000} label="Reset Filtri" onClick={handleResetFilters} />
 
       {/* ---------------- Etichette dei filtri ---------------- */}
-      <PbiText x={28.571428571428566} y={86.190476190476176} w={112.38095238095238} h={18} z={9000}
-        text="Divisione" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.canvas} padding={2} />
-      <PbiText x={190.441} y={83.944} w={228.71066907775767} h={17.944444444444446} z={2000}
-        text="Unità Manutentiva" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
-      <PbiText x={28.75} y={161.875} w={590.625} h={16.875} z={5000}
-        text="Classe Provvedimento" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.slicerHeader} padding={2} />
-      <PbiText x={28.46153846153846} y={234.34319526627218} w={590} h={16.923076923076923} z={2000}
-        text="Scadenza Avviso" sizePt={8} color={PBI_COLORS.textMuted} background={PBI_COLORS.canvas} padding={2} />
+      <PbiText x={20} y={72} w={100} h={16} z={9000}
+        text="Divisione" sizePt={8} color={PBI_COLORS.textMuted} />
+      <PbiText x={138} y={72} w={208} h={16} z={2000}
+        text="Unità Manutentiva" sizePt={8} color={PBI_COLORS.textMuted} />
+      <PbiText x={22} y={144} w={465} h={16} z={5000}
+        text="Classe Provvedimento" sizePt={8} color={PBI_COLORS.textMuted} />
+      <PbiText x={22} y={214} w={465} h={16} z={2000}
+        text="Scadenza Avviso" sizePt={8.5} color={PBI_COLORS.textMuted} />
 
       {/* ---------------- Slicer a tile ---------------- */}
-      <PbiTileSlicer x={11} y={107} w={147} h={28} z={7000}
+      <PbiTileSlicer x={20} y={94} w={100} h={28} z={7000}
         options={DIVISIONI} value={selectedDivisioni} onToggle={(v) => toggle(setSelectedDivisioni, v)} />
-      <PbiTileSlicer x={169} y={104} w={277} h={30} z={1000}
+      <PbiTileSlicer x={138} y={94} w={208} h={28} z={1000}
         options={UNITA_MANUTENTIVE} value={selectedUM} onToggle={(v) => toggle(setSelectedUM, v)} />
-      <PbiTileSlicer x={12} y={183} w={621} h={28} z={4000}
+      <PbiTileSlicer x={20} y={166} w={470} h={28} z={4000}
         options={CLASSI} value={selectedClassi} onToggle={(v) => toggle(setSelectedClassi, v)} />
-      <PbiTileSlicer x={10} y={259.076923076923} w={628.46153846153845} h={28.46153846153846} z={1000}
+      <PbiTileSlicer x={20} y={236} w={470} h={28} z={1000}
         options={SCADENZE} value={selectedScadenze} onToggle={(v) => toggle(setSelectedScadenze, v)} />
 
-      {/* ---------------- Slicer a elenco ---------------- */}
-      <PbiListSlicer x={13.076923076923077} y={308} w={179.23076923076923} h={168} z={15000}
-        title="Linea InRete" options={lineeList} value={selectedLinee} onToggle={(v) => toggle(setSelectedLinee, v)} />
-      <PbiListSlicer x={455} y={308} w={178} h={128} z={27000}
-        title="Classificazione stato" options={CLASSIFICAZIONI} value={selectedClassificazioni}
-        onToggle={(v) => toggle(setSelectedClassificazioni, v)} itemColor={PBI_COLORS.textLight} />
-
-      {/* ---------------- KPI Num. difetti ---------------- */}
-      <PbiText x={457} y={70} w={175} h={22} z={22000} text="Num. difetti" sizePt={11} color={PBI_COLORS.textLight} align="center" />
-      <PbiBox x={457} y={88} w={175} h={55} z={21000} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontSize: fontSizePx(35), color: PBI_COLORS.accent, lineHeight: 1 }}>{filtered.length}</span>
+      {/* ---------------- KPI Num. difetti (uniformato a Avvisi V3 e V4) ---------------- */}
+      <PbiText x={360} y={72} w={135} h={18} z={27000}
+        text="Num. difetti" sizePt={9.5} color={PBI_COLORS.textLight} align="center" />
+      <PbiBox x={360} y={88} w={135} h={42} z={26000}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontSize: fontSizePx(30), fontWeight: 700, color: PBI_COLORS.accent, lineHeight: 1 }}>
+          {filtered.length.toLocaleString('it-IT')}
+        </span>
       </PbiBox>
 
+      {/* ---------------- Slicer a elenco ---------------- */}
+      <PbiListSlicer x={18} y={286} w={139} h={182} z={15000}
+        title="Linea InRete" options={lineeList} value={selectedLinee} onToggle={(v) => toggle(setSelectedLinee, v)} />
+
       {/* ---------------- Grafico a barre Classe Provvedimento ---------------- */}
-      <PbiBox x={205} y={298} w={235} h={180} z={11000} style={{ overflow: 'hidden' }}>
+      <PbiBox x={170} y={286} w={156} h={182} z={11000} style={{ overflow: 'hidden' }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart layout="vertical" data={classeChartData} margin={{ top: 5, right: 26, left: 0, bottom: 0 }}>
             <XAxis type="number" hide />
-            <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={64}
-              tick={{ fill: PBI_COLORS.textLight, fontSize: 11 }} />
-            <Bar dataKey="count" fill={PBI_COLORS.accent} isAnimationActive={false} barSize={14}>
-              <LabelList dataKey="count" position="right" fill={PBI_COLORS.textLight} fontSize={12} />
+            <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={48}
+              tick={{ fill: PBI_COLORS.textLight, fontSize: 10 }} />
+            <Bar dataKey="count" fill={PBI_COLORS.accent} isAnimationActive={false} barSize={12} radius={[0, 2, 2, 0]}>
+              <LabelList dataKey="count" position="right" fill={PBI_COLORS.textLight} fontSize={11} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </PbiBox>
 
+      {/* ---------------- Classificazione stato ---------------- */}
+      <PbiListSlicer x={340} y={286} w={151} h={144} z={27000}
+        title="Classificazione stato" options={CLASSIFICAZIONI} value={selectedClassificazioni}
+        onToggle={(v) => toggle(setSelectedClassificazioni, v)} itemColor={PBI_COLORS.textLight} />
+
+      {/* ---------------- Drill PdM/avviso ---------------- */}
+      <PbiButton x={336} y={442} w={159} h={30} z={26500} variant="light"
+        label="Drill PdM/avviso" disabled={!selectedItem} onClick={() => selectedItem && onNavigateToDrill(selectedItem)} />
+
       {/* ---------------- Mappa ---------------- */}
-      <PbiBox x={656.36363636363626} y={17.27272727272727} w={605.45454545454538} h={420} z={8000} style={{ overflow: 'hidden' }}>
+      <PbiBox x={505} y={8} w={760} h={464} z={8000} style={{ overflow: 'hidden' }}>
         <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
       </PbiBox>
 
-      {/* ---------------- Drill PdM/avviso ---------------- */}
-      <PbiButton x={500} y={444} w={130} h={34} z={26500} variant="light"
-        label="Drill PdM/avviso" disabled={!selectedItem} onClick={() => selectedItem && onNavigateToDrill(selectedItem)} />
-
       {/* ---------------- Tabella (20 colonne) ---------------- */}
-      <PbiBox x={14.545454545454545} y={486} w={1250.9090909090908} h={222} z={24000}
+      <PbiBox x={15} y={482} w={1250} h={226} z={24000}
         style={{ border: `2px solid ${PBI_COLORS.accent}`, overflow: 'hidden', background: PBI_COLORS.tableRowSecondary }}>
         <div className="scrollbar-thin" style={{ width: '100%', height: '100%', overflow: 'auto' }}>
           <table style={{ borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', width: TABLE_WIDTH, fontSize: fontSizePx(8) }}>

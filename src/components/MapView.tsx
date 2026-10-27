@@ -170,10 +170,18 @@ export const MapView: React.FC<MapViewProps> = ({
       const abbacoGrp = L.layerGroup().addTo(map);
       abbacoLayerRef.current = abbacoGrp;
 
+      const trackBounds = tracksLayer.getBounds();
+      if (trackBounds.isValid()) {
+        map.fitBounds(trackBounds, { padding: [15, 15] });
+      }
+
       mapInstanceRef.current = map;
 
       setTimeout(() => {
         map.invalidateSize();
+        if (trackBounds.isValid()) {
+          map.fitBounds(trackBounds, { padding: [15, 15] });
+        }
       }, 200);
     }
   }, []);

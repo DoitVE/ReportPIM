@@ -1,7 +1,15 @@
-import React, { useState, useMemo } from 'react';
-import { PdmV5Item, AvvisoV5Detail } from '../../types';
-import { initialAvvisiV5Details } from '../../data/v5Dataset';
-import { RotateCcw, Search, Database, RefreshCw } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { PdmV5Item } from '../../types';
+import {
+  PbiCanvas,
+  PbiBox,
+  PbiShape,
+  PbiText,
+  PbiListSlicer,
+  PbiButton,
+  PBI_COLORS,
+  fontSizePx,
+} from '../pbi/primitives';
 
 interface PageCercaSeTeProps {
   pdmList: PdmV5Item[];
@@ -12,6 +20,167 @@ interface PageCercaSeTeProps {
   onLoadDemoData?: () => void;
 }
 
+/* -------------------- Palette (dai visual.json PBIR) -------------------- */
+const RED = PBI_COLORS.accent; // #F26D6D
+const GREEN = PBI_COLORS.good; // #6CC070
+const SLICER_YELLOW = '#F5C26B';
+const HEADER_SLICER = PBI_COLORS.slicerHeader; // Theme#1 @ 0.1 -> #1A1A1A
+
+/* -------------------- Conditional formatting -------------------- */
+/** "Ritardo PdM"/"Ritardo Avv.": rosso se c'è ritardo, altrimenti nascosto. */
+const ritardoColor = (v: string): string => (v && v !== '0' && v.includes('Ritardo') ? RED : '#2B2D31');
+
+interface SeTeColumn {
+  key: string;
+  label: string;
+  width: number;
+  value: (r: PdmV5Item) => string;
+  color?: (r: PdmV5Item, value: string) => string | undefined;
+}
+
+/**
+ * Tabella superiore (`tableEx` 281214caa89eecee3fd3): 15 colonne nell'ordine del
+ * PBIR, con le larghezze esatte di `columnWidth`.
+ */
+const TABLE_PDM: SeTeColumn[] = [
+  { key: 'pdm', label: 'PdM', width: 61.64009689447592, value: (r) => r.pdm },
+  { key: 'avviso', label: 'Avviso', width: 66.17380679551866, value: (r) => r.avviso },
+  { key: 'classe', label: 'Classe', width: 32.850078302337906, value: (r) => r.classe },
+  { key: 'osservazioni', label: 'Osservazioni', width: 213.1070076504108, value: (r) => r.osservazioni },
+  { key: 'linea', label: 'Linea InRete', width: 94.33271457536863, value: (r) => r.linea },
+  { key: 'km_linea', label: 'Km linea', width: 55, value: (r) => r.km_linea },
+  { key: 'sede_tecnica', label: 'Sede Tecnica', width: 143.6011112668033, value: (r) => r.sede_tecnica },
+  { key: 'data_scoperta', label: 'Data scoperta', width: 72.16862817790042, value: (r) => r.data_scoperta },
+  { key: 'fine_richiesta', label: 'Fine Rich.', width: 69.54297650170533, value: (r) => r.fine_richiesta ?? '' },
+  {
+    key: 'tolto_dop', label: "Tolto d'op.", width: 38.20606457660532, value: (r) => r.tolto_dop,
+    color: (_r, v) => (v === 'N' ? RED : v === 'S' ? GREEN : undefined),
+  },
+  { key: 'data_tolto_dop', label: "Data tolto d'op.", width: 69.44226220986364, value: (r) => r.data_tolto_dop },
+  { key: 'scadenza', label: 'Scadenza', width: 79.65238480194017, value: (r) => r.scadenza },
+  { key: 'ritardo_pdm', label: 'Ritardo PdM', width: 79.18319612732604, value: (r) => r.ritardo_pdm ?? '', color: (_r, v) => ritardoColor(v) },
+  {
+    key: 'data_tolto_minore_scoperta', label: "Data Tolto d'opera < Data scoperta", width: 101.638199194941,
+    value: (r) => (r.data_tolto_minore_scoperta ? "Data Tolto d'opera < Data scoperta" : ''), color: () => RED,
+  },
+  {
+    key: 'non_visibile_zstmaia', label: 'PdM non visibile in ZSTMAIA', width: 91.03476151980598,
+    value: (r) => (r.non_visibile_zstmaia ? 'PdM non visibile in ZSTMAIA' : ''), color: () => RED,
+  },
+];
+
+/**
+ * Tabella inferiore (`tableEx` 54b02bf6afcd38275d22): 11 colonne nell'ordine del
+ * PBIR, con le larghezze esatte di `columnWidth` (St.sist. usa il default 90).
+ */
+const TABLE_AVVISI: SeTeColumn[] = [
+  { key: 'pdm', label: 'PdM', width: 61.572951406787745, value: (r) => r.pdm },
+  { key: 'avviso', label: 'Avviso', width: 69.8046581517656, value: (r) => r.avviso },
+  { key: 'testo_esteso', label: 'Testo Esteso', width: 353.21034299181525, value: (r) => r.testo_esteso ?? '' },
+  { key: 'sede_tecnica', label: 'Sede tecnica', width: 151.02145080947113, value: (r) => r.sede_tecnica },
+  { key: 'inizio_richiesta', label: 'Inizio Rich.', width: 72.68970698722765, value: (r) => r.inizio_richiesta ?? '' },
+  { key: 'fine_richiesta', label: 'Fine Rich.', width: 70.7663410969196, value: (r) => r.fine_richiesta ?? '' },
+  {
+    key: 'stato_avviso', label: 'Stato sist.', width: 90,
+    value: (r) => r.stato_avviso, color: (_r, v) => (v.includes('MECO') ? GREEN : RED),
+  },
+  { key: 'data_chiusura', label: 'Data chiusura', width: 77.5828617623282, value: (r) => r.data_chiusura ?? '' },
+  { key: 'ritardo_avv', label: 'Ritardo Avv.', width: 99.31284714303257, value: (r) => r.ritardo_avv ?? '', color: (_r, v) => ritardoColor(v) },
+  {
+    key: 'avviso_chiusura_antec_inizio', label: 'Data chiusura avv. < Data inizio avv.', width: 103.84868710864905,
+    value: (r) => (r.avviso_chiusura_antec_inizio ? 'Data chiusura avv. < Data inizio avv.' : ''), color: () => RED,
+  },
+  {
+    key: 'avviso_chiusura_futura', label: 'Data chiusura avv. futura', width: 75.51333872271624,
+    value: (r) => (r.avviso_chiusura_futura ? 'Data chiusura avv. futura' : ''), color: () => RED,
+  },
+];
+
+const TABLE_PDM_WIDTH = TABLE_PDM.reduce((sum, c) => sum + c.width, 0);
+const TABLE_AVVISI_WIDTH = TABLE_AVVISI.reduce((sum, c) => sum + c.width, 0);
+
+/* -------------------- Tabella -------------------- */
+const SeTeTable: React.FC<{
+  x: number; y: number; w: number; h: number; z: number;
+  columns: SeTeColumn[];
+  width: number;
+  rows: PdmV5Item[];
+  selectedRowId: string;
+  onSelectRow: (pdm: string) => void;
+  onDrillRow: (row: PdmV5Item) => void;
+}> = ({ x, y, w, h, z, columns, width, rows, selectedRowId, onSelectRow, onDrillRow }) => (
+  <PbiBox x={x} y={y} w={w} h={h} z={z}
+    style={{ border: `2px solid ${RED}`, overflow: 'hidden', background: PBI_COLORS.band }}>
+    <div className="scrollbar-thin" style={{ width: '100%', height: '100%', overflow: 'auto' }}>
+      <table style={{ borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed', width, fontSize: fontSizePx(8) }}>
+        <colgroup>
+          {columns.map((c) => <col key={c.key} style={{ width: c.width }} />)}
+        </colgroup>
+        <thead>
+          <tr>
+            {columns.map((c) => (
+              <th
+                key={c.key}
+                style={{
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 1,
+                  background: PBI_COLORS.tableHeader,
+                  color: PBI_COLORS.textPrimary,
+                  fontWeight: 400,
+                  textAlign: 'left',
+                  padding: '3px 4px',
+                  borderRight: `1px solid ${RED}`,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {c.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => {
+            const isSelected = row.pdm === selectedRowId;
+            return (
+              <tr
+                key={`${row.pdm}-${i}`}
+                onClick={() => onSelectRow(row.pdm)}
+                onDoubleClick={() => onDrillRow(row)}
+                style={{ background: isSelected ? '#000000' : PBI_COLORS.tableRowSecondary, cursor: 'pointer' }}
+              >
+                {columns.map((c) => {
+                  const value = c.value(row);
+                  const color = c.color ? c.color(row, value) : undefined;
+                  return (
+                    <td
+                      key={c.key}
+                      title={value}
+                      style={{
+                        padding: '2px 4px',
+                        color: color ?? PBI_COLORS.textPrimary,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        borderRight: `1px solid ${PBI_COLORS.band}`,
+                      }}
+                    >
+                      {value}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  </PbiBox>
+);
+
+/* -------------------- Pagina -------------------- */
 export const PageCercaSeTe: React.FC<PageCercaSeTeProps> = ({
   pdmList,
   dataAggiornamento,
@@ -20,336 +189,178 @@ export const PageCercaSeTe: React.FC<PageCercaSeTeProps> = ({
   onOpenFileLoader,
   onLoadDemoData,
 }) => {
-  // Slicers
-  const [selectedSeTe, setSelectedSeTe] = useState<string>('LO0378-AB-AB01-DEV-D02');
-  const [searchSeTeInput, setSearchSeTeInput] = useState<string>('');
-  const [searchAvviso, setSearchAvviso] = useState<string>('');
-  const [searchPdm, setSearchPdm] = useState<string>('');
-  const [annoRange, setAnnoRange] = useState<[number, number]>([2000, 2226]);
+  // Filtri (multi-selezione), come gli slicer del PBIR
+  const [selAvviso, setSelAvviso] = useState<string[]>([]);
+  const [selPdm, setSelPdm] = useState<string[]>([]);
+  const [selSede, setSelSede] = useState<string[]>([]);
 
-  // List of all unique Sede Tecnica
-  const seteList = useMemo(() => {
-    const s = new Set<string>();
-    s.add('LO0378-AB-AB01-DEV-D02');
-    s.add('LO3002-BC-BC42-DEV-I02');
-    s.add('LO3002-BC-BC24-DEV-D16');
-    s.add('TR3040-BC-BC02-ROT-R01');
-    s.add('TR7645-BC-BC02-ROT-R02');
-    s.add('LO1776-BC-BC01-ROT-R02');
-    s.add('TR4143-BC-BC01-ROT-R01');
-    s.add('LO1044-BC-BC01-ROT-R02');
-    pdmList.forEach(p => { if (p.sede_tecnica) s.add(p.sede_tecnica); });
-    return Array.from(s).sort();
-  }, [pdmList]);
+  const [selectedRowId, setSelectedRowId] = useState<string>(pdmList[0]?.pdm ?? '');
 
-  const filteredSeteList = useMemo(() => {
-    if (!searchSeTeInput) return seteList.slice(0, 8);
-    return seteList.filter(st => st.toLowerCase().includes(searchSeTeInput.toLowerCase())).slice(0, 8);
-  }, [seteList, searchSeTeInput]);
-
-  const handleResetFilters = () => {
-    setSelectedSeTe('LO0378-AB-AB01-DEV-D02');
-    setSearchSeTeInput('');
-    setSearchAvviso('');
-    setSearchPdm('');
-    setAnnoRange([2000, 2226]);
+  const toggle = (setter: React.Dispatch<React.SetStateAction<string[]>>, item: string) => {
+    setter((prev) => (prev.includes(item) ? prev.filter((x) => x !== item) : [...prev, item]));
   };
 
-  // Filtered PdM list
-  const filteredPdm = useMemo(() => {
-    return pdmList.filter(p => {
-      if (selectedSeTe && p.sede_tecnica !== selectedSeTe) return false;
-      if (searchPdm && !p.pdm.includes(searchPdm)) return false;
-      if (searchAvviso && p.avviso && !p.avviso.includes(searchAvviso)) return false;
-      return true;
-    });
-  }, [pdmList, selectedSeTe, searchPdm, searchAvviso]);
+  // Opzioni derivate dal dataset per gli slicer "a ricerca"
+  const uniq = (getter: (r: PdmV5Item) => string): string[] => {
+    const set = new Set<string>();
+    pdmList.forEach((p) => { const v = getter(p); if (v) set.add(v); });
+    return Array.from(set).sort();
+  };
+  const avvisiList = useMemo(() => uniq((p) => p.avviso), [pdmList]);
+  const pdmOptions = useMemo(() => uniq((p) => p.pdm), [pdmList]);
+  const sediList = useMemo(() => uniq((p) => p.sede_tecnica), [pdmList]);
 
-  // Avvisi details corresponding to selected Sede
-  const filteredAvvisiDetails = useMemo(() => {
-    return initialAvvisiV5Details.filter(a => {
-      if (selectedSeTe && a.sede_tecnica !== selectedSeTe) return false;
-      if (searchAvviso && !a.avviso.includes(searchAvviso)) return false;
-      if (searchPdm && a.pdm && !a.pdm.includes(searchPdm)) return false;
-      return true;
-    });
-  }, [selectedSeTe, searchAvviso, searchPdm]);
+  // Slicer "Anno" (mode Between): intervallo minimo/massimo disponibile
+  const anniDisponibili = useMemo(() => {
+    const anni = pdmList.map((p) => p.anno).filter((a): a is number => typeof a === 'number');
+    return anni.length ? anni : [];
+  }, [pdmList]);
+  const [anno, setAnno] = useState<[number, number]>(() => {
+    const anni = pdmList.map((p) => p.anno).filter((a): a is number => typeof a === 'number');
+    return anni.length ? [Math.min(...anni), Math.max(...anni)] : [2026, 2026];
+  });
+
+  const handleResetFilters = () => {
+    setSelAvviso([]);
+    setSelPdm([]);
+    setSelSede([]);
+    setAnno(anniDisponibili.length ? [Math.min(...anniDisponibili), Math.max(...anniDisponibili)] : [2026, 2026]);
+  };
+
+  const filtered = useMemo(() => pdmList.filter((item) => {
+    if (selAvviso.length > 0 && !selAvviso.includes(item.avviso)) return false;
+    if (selPdm.length > 0 && !selPdm.includes(item.pdm)) return false;
+    if (selSede.length > 0 && !selSede.includes(item.sede_tecnica)) return false;
+    if (anniDisponibili.length > 0) {
+      if (item.anno === undefined) return false;
+      if (item.anno < anno[0] || item.anno > anno[1]) return false;
+    }
+    return true;
+  }), [pdmList, selAvviso, selPdm, selSede, anno, anniDisponibili]);
+
+  // Filtro del `tableEx` superiore: PdM_definitivo non nullo e non vuoto
+  const pdmRows = useMemo(() => filtered.filter((r) => r.pdm !== ''), [filtered]);
+
+  // Filtro del `tableEx` inferiore: IW29_full.Avviso non nullo e non vuoto
+  const avvisiRows = useMemo(() => filtered.filter((r) => !!r.avviso), [filtered]);
 
   return (
-    <div className="bg-[#121316] text-[#e2e8f0] min-h-full flex flex-col space-y-2.5 font-sans select-none">
-      {/* Top Banner Row matching Screenshot 3 */}
-      <div className="flex flex-wrap items-center justify-between border-b border-[#2d3139] pb-2">
-        <div className="flex items-center space-x-3">
-          <div className="h-9 px-2.5 bg-white rounded flex items-center justify-center shadow-sm">
-            <span className="text-[#008542] font-black tracking-tighter text-base">RFI</span>
-            <span className="text-[#dc2626] font-bold text-[10px] ml-1 uppercase">FS</span>
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-[#f43f5e] tracking-tight">
-              Difetti di binario - DOIT VE
-            </h1>
-            <div className="flex items-center space-x-4 text-xs mt-0.5">
-              <span className="text-white font-bold text-sm">Cerca per SeTe V5</span>
-              <span className="text-[#94a3b8]">Dati al: <strong className="text-white font-mono">{dataAggiornamento}</strong></span>
-            </div>
-          </div>
+    <PbiCanvas>
+      {/* ================= Sfondi / pannelli ================= */}
+      <PbiShape x={748.313043478261} y={53.42028985507248} w={178.08695652173913} h={93.49565217391304} z={1000} fill={PBI_COLORS.card} radius={8} />
+      <PbiShape x={0} y={138} w={1280} h={275} z={3000} fill={PBI_COLORS.band} radius={5} />
+      <PbiShape x={0} y={437.0780856423174} w={1280.4030226700252} h={282.9219143576826} z={4000} fill={PBI_COLORS.band} radius={5} />
+      <PbiShape x={917.4996778839941} y={51.198067632850254} w={163.61739130434782} h={94.6086956521739} z={13000} fill={PBI_COLORS.card} radius={8} />
+      <PbiShape x={499.32992005748656} y={52.92553669271536} w={256.6208569118836} h={94.16329830234437} z={16000} fill={PBI_COLORS.card} radius={8} />
+      <PbiShape x={1073.8812539297578} y={25.792688403844426} w={205.91754244139045} h={120.03233629749393} z={18000} fill={PBI_COLORS.card} radius={8} />
+
+      {/* ================= Intestazione ================= */}
+      <PbiText x={308} y={12} w={339} h={67} z={0} text="Difetti di binario - DOIT VE" sizePt={20} bold color={RED} />
+      <PbiText x={307.77777777777777} y={45.55555555555556} w={194.44444444444443} h={25.555555555555554} z={11000}
+        text="Cerca per SeTe V5" sizePt={15} bold color={PBI_COLORS.textLight} />
+      <PbiBox x={39.8992443324937} y={11.788413098236775} w={249.37027707808562} h={74.35768261964735} z={8000}>
+        <img src="/assets/logo_ufficiale.png" alt="RFI" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }} />
+      </PbiBox>
+      <PbiText x={241.44444444444417} y={69.99999999999996} w={118} h={28} z={9000}
+        text="Dati al:" sizePt={11} color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
+      <PbiText x={349.44444444444434} y={70.99999999999996} w={131} h={27} z={5000}
+        text={dataAggiornamento} sizePt={12} color={PBI_COLORS.textLight} vAlign="middle" />
+
+      {/* ================= Bottoni ================= */}
+      <PbiButton x={0} y={0} w={99.74811083123424} h={39.8992443324937} z={12000} label="Indietro" sizePt={9} onClick={onBack} />
+      <PbiButton x={624.4444444444445} y={5.555555555555555} w={122.22222222222221} h={40} z={20000} label="Reset Filtri" sizePt={9} onClick={handleResetFilters} />
+
+      {/* ================= Slicer ================= */}
+      <PbiListSlicer x={763.8956521739132} y={64.55072463768114} w={143.58260869565217} h={67.89565217391305} z={10000}
+        title="Cerca Avviso" options={avvisiList} value={selAvviso} onToggle={(v) => toggle(setSelAvviso, v)}
+        searchable itemColor={PBI_COLORS.textLight} itemSizePt={10}
+        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={12} />
+      <PbiListSlicer x={933.0822865796463} y={62.32850241545894} w={129.11304347826086} h={72.34782608695652} z={14000}
+        title="Cerca PdM" options={pdmOptions} value={selPdm} onToggle={(v) => toggle(setSelPdm, v)}
+        searchable itemColor={PBI_COLORS.textLight} itemSizePt={10}
+        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={12} />
+      <PbiListSlicer x={514.8513428545765} y={64.30791341058118} w={219.36944219886823} h={72.43330638641875} z={17000}
+        title="Cerca Sede tecnica" options={sediList} value={selSede} onToggle={(v) => toggle(setSelSede, v)}
+        searchable itemColor={PBI_COLORS.textLight} itemSizePt={10}
+        headerBackground={SLICER_YELLOW} headerColor={HEADER_SLICER} headerSizePt={12} />
+
+      {/* Slicer "Anno" (mode Between) */}
+      <PbiBox x={1086.8686868686864} y={41.313131313131315} w={179.3939393939394} h={92.12121212121212} z={19000}
+        style={{ background: PBI_COLORS.card, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ background: SLICER_YELLOW, color: HEADER_SLICER, fontSize: fontSizePx(12), padding: '3px 6px', flex: '0 0 auto' }}>
+          Anno
         </div>
-
-        <button
-          onClick={handleResetFilters}
-          className="flex items-center space-x-1 px-3 py-1 bg-[#1e222a] hover:bg-[#282d38] border border-[#3f4553] rounded text-xs font-semibold text-slate-200 transition-colors cursor-pointer shadow-sm"
-        >
-          <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-          <span>Reset Filtri</span>
-        </button>
-      </div>
-
-      {/* Top Notice if Unpopulated */}
-      {pdmList.length === 0 && (
-        <div className="bg-[#1c1f26] border-l-4 border-amber-400 p-2.5 rounded border border-[#2e323b] flex flex-wrap items-center justify-between gap-2 shadow-md">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-1.5 bg-amber-500/15 text-amber-400 rounded">
-              <Database className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="font-bold text-white text-xs block">Vista Ricerca per Sede Tecnica pronta</span>
-              <span className="text-[11px] text-slate-400">
-                Alimenta la web app con i file SAP o carica la demo per consultare i Punti di Misura e gli Avvisi associati a ciascuna Sede Tecnica.
-              </span>
-            </div>
+        <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6, padding: '4px 8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="number"
+              value={anno[0]}
+              onChange={(e) => setAnno([Number(e.target.value), anno[1]])}
+              style={{ width: 68, background: PBI_COLORS.panel, color: PBI_COLORS.textLight, border: `1px solid ${PBI_COLORS.panel}`, fontSize: fontSizePx(8), padding: '2px 4px', outline: 'none' }}
+            />
+            <span style={{ color: PBI_COLORS.textMuted, fontSize: fontSizePx(8) }}>-</span>
+            <input
+              type="number"
+              value={anno[1]}
+              onChange={(e) => setAnno([anno[0], Number(e.target.value)])}
+              style={{ width: 68, background: PBI_COLORS.panel, color: PBI_COLORS.textLight, border: `1px solid ${PBI_COLORS.panel}`, fontSize: fontSizePx(8), padding: '2px 4px', outline: 'none' }}
+            />
           </div>
-          <div className="flex items-center space-x-2">
+          <input
+            type="range"
+            min={anniDisponibili.length ? Math.min(...anniDisponibili) : 2020}
+            max={anniDisponibili.length ? Math.max(...anniDisponibili) : 2026}
+            value={anno[1]}
+            onChange={(e) => setAnno([anno[0], Number(e.target.value)])}
+            style={{ width: '100%', accentColor: SLICER_YELLOW }}
+          />
+        </div>
+      </PbiBox>
+
+      {/* ================= Etichette tabelle ================= */}
+      <PbiText x={24} y={112} w={150} h={31} z={7000} text="PdM" sizePt={11} bold color={PBI_COLORS.textLight} />
+      <PbiText x={19} y={411} w={159} h={31} z={2000} text="Avvisi" sizePt={11} bold color={PBI_COLORS.textLight} />
+
+      {/* ================= Tabella PdM (15 colonne) ================= */}
+      <SeTeTable x={14.3928035982009} y={152.56371814092952} w={1251.2143928035982} h={246.5967016491754} z={6000}
+        columns={TABLE_PDM} width={TABLE_PDM_WIDTH} rows={pdmRows}
+        selectedRowId={selectedRowId} onSelectRow={setSelectedRowId} onDrillRow={onNavigateToDrill} />
+
+      {/* ================= Tabella Avvisi (11 colonne) ================= */}
+      <SeTeTable x={14.3928035982009} y={452.89355322338827} w={1250.254872563718} h={251.3943028485757} z={15000}
+        columns={TABLE_AVVISI} width={TABLE_AVVISI_WIDTH} rows={avvisiRows}
+        selectedRowId={selectedRowId} onSelectRow={setSelectedRowId} onDrillRow={onNavigateToDrill} />
+
+      {/* ================= Stato vuoto ================= */}
+      {pdmList.length === 0 && (
+        <PbiBox x={0} y={0} w={1280} h={720} z={65000}
+          style={{ background: 'rgba(0,0,0,0.72)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+          <span style={{ color: PBI_COLORS.textPrimary, fontSize: 15, fontWeight: 700 }}>Web app non alimentata (0 record)</span>
+          <span style={{ color: PBI_COLORS.textMuted, fontSize: 12 }}>
+            Alimenta la web app con i file SAP (es. ZSTMAIA, IW29) oppure carica i dati demo.
+          </span>
+          <div style={{ display: 'flex', gap: 10 }}>
             {onOpenFileLoader && (
               <button
+                type="button"
                 onClick={onOpenFileLoader}
-                className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded cursor-pointer shadow"
+                style={{ background: RED, color: '#111', border: 'none', borderRadius: 4, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
               >
                 Alimenta Web App
               </button>
             )}
             {onLoadDemoData && (
               <button
+                type="button"
                 onClick={onLoadDemoData}
-                className="px-3 py-1 bg-[#25282e] hover:bg-[#2f333a] border border-[#3f4553] text-amber-300 font-semibold text-xs rounded cursor-pointer flex items-center space-x-1"
+                style={{ background: PBI_COLORS.button, color: PBI_COLORS.textLight, border: `1px solid ${PBI_COLORS.tileBorder}`, borderRadius: 4, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
               >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Carica Demo</span>
+                Carica Demo
               </button>
             )}
           </div>
-        </div>
+        </PbiBox>
       )}
-
-      {/* Top Search Controls Bar matching Screenshot 3 */}
-      <div className="grid grid-cols-12 gap-2 text-xs">
-        {/* Cerca Sede tecnica */}
-        <div className="col-span-12 sm:col-span-6 md:col-span-4 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] shadow-sm">
-          <span className="text-[10px] uppercase font-bold text-amber-300 block mb-1">Cerca Sede tecnica</span>
-          <div className="relative mb-1">
-            <Search className="w-3.5 h-3.5 absolute left-1.5 top-1.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Cerca"
-              value={searchSeTeInput}
-              onChange={e => setSearchSeTeInput(e.target.value)}
-              className="w-full bg-[#141518] border border-[#3f4553] rounded pl-6 pr-2 py-0.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
-            />
-          </div>
-          <div className="space-y-0.5 max-h-20 overflow-y-auto">
-            {filteredSeteList.map(st => (
-              <label key={st} className="flex items-center space-x-1.5 cursor-pointer py-0.5 hover:bg-[#252830] px-1 rounded">
-                <input
-                  type="checkbox"
-                  checked={selectedSeTe === st}
-                  onChange={() => setSelectedSeTe(selectedSeTe === st ? '' : st)}
-                  className="w-3 h-3 text-amber-500 bg-[#141518]"
-                />
-                <span className={`text-[11px] font-mono truncate ${selectedSeTe === st ? 'text-amber-300 font-bold' : 'text-[#cbd5e1]'}`}>
-                  {st}
-                </span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        {/* Cerca Avviso */}
-        <div className="col-span-12 sm:col-span-6 md:col-span-3 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] uppercase font-bold text-amber-300 block mb-1">Cerca Avviso</span>
-            <div className="relative mb-1">
-              <Search className="w-3.5 h-3.5 absolute left-1.5 top-1.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Cerca"
-                value={searchAvviso}
-                onChange={e => setSearchAvviso(e.target.value)}
-                className="w-full bg-[#141518] border border-[#3f4553] rounded pl-6 pr-2 py-0.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
-              />
-            </div>
-            <label className="flex items-center space-x-1.5 cursor-pointer pt-1">
-              <input
-                type="checkbox"
-                checked={!searchAvviso}
-                onChange={() => setSearchAvviso('')}
-                className="w-3 h-3 text-amber-500 bg-[#141518]"
-              />
-              <span className="text-[11px] text-slate-300">(Vuoto)</span>
-            </label>
-          </div>
-        </div>
-
-        {/* Cerca PdM */}
-        <div className="col-span-12 sm:col-span-6 md:col-span-3 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] shadow-sm flex flex-col justify-between">
-          <div>
-            <span className="text-[10px] uppercase font-bold text-amber-300 block mb-1">Cerca PdM</span>
-            <div className="relative mb-1">
-              <Search className="w-3.5 h-3.5 absolute left-1.5 top-1.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Cerca"
-                value={searchPdm}
-                onChange={e => setSearchPdm(e.target.value)}
-                className="w-full bg-[#141518] border border-[#3f4553] rounded pl-6 pr-2 py-0.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono"
-              />
-            </div>
-            <label className="flex items-center space-x-1.5 cursor-pointer pt-1">
-              <input
-                type="checkbox"
-                checked={!searchPdm}
-                onChange={() => setSearchPdm('')}
-                className="w-3 h-3 text-amber-500 bg-[#141518]"
-              />
-              <span className="text-[11px] text-slate-300">(Vuoto)</span>
-            </label>
-          </div>
-        </div>
-
-        {/* Anno Slider matching Screenshot 3 */}
-        <div className="col-span-12 sm:col-span-6 md:col-span-2 bg-[#1c1f26] p-2 rounded-md border border-[#2e333d] shadow-sm flex flex-col justify-between">
-          <span className="text-[10px] uppercase font-bold text-amber-300 block mb-1">Anno</span>
-          <div className="flex items-center space-x-2">
-            <input
-              type="number"
-              value={annoRange[0]}
-              onChange={e => setAnnoRange([parseInt(e.target.value) || 2000, annoRange[1]])}
-              className="w-14 bg-[#141518] border border-[#3f4553] text-center font-mono py-0.5 text-xs text-white rounded"
-            />
-            <input
-              type="number"
-              value={annoRange[1]}
-              onChange={e => setAnnoRange([annoRange[0], parseInt(e.target.value) || 2226])}
-              className="w-14 bg-[#141518] border border-[#3f4553] text-center font-mono py-0.5 text-xs text-white rounded"
-            />
-          </div>
-          <div className="pt-2 px-1">
-            <input
-              type="range"
-              min="2000"
-              max="2226"
-              value={annoRange[1]}
-              onChange={e => setAnnoRange([annoRange[0], parseInt(e.target.value)])}
-              className="w-full accent-amber-400"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Two Tables vertically stacked matching Screenshot 3 */}
-      {/* 1. Upper Table: PdM */}
-      <div className="bg-[#1c1f26] rounded-md border border-[#2e333d] overflow-hidden flex flex-col flex-1 shadow-sm min-h-[180px]">
-        <div className="px-3 py-1.5 bg-[#16181d] border-b border-[#2e333d] flex items-center justify-between text-xs shrink-0">
-          <span className="font-bold text-white uppercase text-[11px] tracking-wide">PdM ({filteredPdm.length} righe)</span>
-          <span className="text-[10.5px] text-[#94a3b8]">Sede: <strong className="text-amber-400 font-mono">{selectedSeTe || 'Tutte'}</strong></span>
-        </div>
-        <div className="overflow-auto flex-1 max-h-[calc(35vh)] min-h-[150px] scrollbar-thin">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#141518] sticky top-0 border-b border-[#2e333d] text-[#94a3b8] text-[10.5px] uppercase font-semibold">
-              <tr>
-                <th className="py-1.5 px-2">PdM</th>
-                <th className="py-1.5 px-2">Avviso</th>
-                <th className="py-1.5 px-2">Classe</th>
-                <th className="py-1.5 px-2">Osservazioni</th>
-                <th className="py-1.5 px-2">Linea InRete</th>
-                <th className="py-1.5 px-2">Km linea</th>
-                <th className="py-1.5 px-2">Sede Tecnica</th>
-                <th className="py-1.5 px-2">Data scoperta</th>
-                <th className="py-1.5 px-2">Fine Rich.</th>
-                <th className="py-1.5 px-2">Tolto d'op.</th>
-                <th className="py-1.5 px-2">Data tolto d'op.</th>
-                <th className="py-1.5 px-2">Scadenza</th>
-                <th className="py-1.5 px-2">Ritardo PdM</th>
-                <th className="py-1.5 px-2">Data Tolto d'opera &lt; Data scoperta</th>
-                <th className="py-1.5 px-2">PdM non visibile in ZSTMAIA</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#252932] text-[11px] font-mono text-[#cbd5e1]">
-              {filteredPdm.map(row => (
-                <tr key={row.pdm} className="hover:bg-[#20242e] transition-colors">
-                  <td className="py-1 px-2 font-bold text-white">{row.pdm}</td>
-                  <td className="py-1 px-2 text-cyan-300">{row.avviso || '-'}</td>
-                  <td className="py-1 px-2 font-bold text-rose-400">{row.classe}</td>
-                  <td className="py-1 px-2 font-sans text-slate-300 truncate max-w-[200px]">{row.osservazioni}</td>
-                  <td className="py-1 px-2 font-sans">{row.linea}</td>
-                  <td className="py-1 px-2">{row.km_linea}</td>
-                  <td className="py-1 px-2 text-slate-300">{row.sede_tecnica}</td>
-                  <td className="py-1 px-2 text-slate-400">{row.data_scoperta || '03/02/2020'}</td>
-                  <td className="py-1 px-2 text-slate-400">03/10/2020</td>
-                  <td className="py-1 px-2 text-emerald-400 font-bold">{row.tolto_dop}</td>
-                  <td className="py-1 px-2 text-slate-400">{row.data_tolto_dop || '08/04/2020'}</td>
-                  <td className="py-1 px-2 text-emerald-300">COMPLETATO</td>
-                  <td className="py-1 px-2 text-slate-400">-</td>
-                  <td className="py-1 px-2 text-slate-400">-</td>
-                  <td className="py-1 px-2 text-slate-400">-</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* 2. Lower Table: Avvisi */}
-      <div className="bg-[#1c1f26] rounded-md border border-[#2e333d] overflow-hidden flex flex-col flex-1 shadow-sm min-h-[180px]">
-        <div className="px-3 py-1.5 bg-[#16181d] border-b border-[#2e333d] flex items-center justify-between text-xs shrink-0">
-          <span className="font-bold text-white uppercase text-[11px] tracking-wide">Avvisi ({filteredAvvisiDetails.length} righe)</span>
-          <span className="text-[10.5px] text-[#94a3b8]">Dettaglio ordini di manutenzione associati</span>
-        </div>
-        <div className="overflow-auto flex-1 max-h-[calc(35vh)] min-h-[150px] scrollbar-thin">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#141518] sticky top-0 border-b border-[#2e333d] text-[#94a3b8] text-[10.5px] uppercase font-semibold">
-              <tr>
-                <th className="py-1.5 px-2">PdM</th>
-                <th className="py-1.5 px-2">Avviso</th>
-                <th className="py-1.5 px-2">Testo esteso</th>
-                <th className="py-1.5 px-2">Sede tecnica</th>
-                <th className="py-1.5 px-2">Inizio richiesta</th>
-                <th className="py-1.5 px-2">Fine richiesta</th>
-                <th className="py-1.5 px-2">Stato sistema</th>
-                <th className="py-1.5 px-2">Data chiusura</th>
-                <th className="py-1.5 px-2">Ritardo Avv.</th>
-                <th className="py-1.5 px-2">Data chiusura avv. &lt; Data inizio avv.</th>
-                <th className="py-1.5 px-2">Data chiusura avv. futura</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#252932] text-[11px] font-mono text-[#cbd5e1]">
-              {filteredAvvisiDetails.map((row, idx) => (
-                <tr key={`${row.avviso}-${idx}`} className="hover:bg-[#20242e] transition-colors">
-                  <td className="py-1 px-2 text-white font-bold">{row.pdm}</td>
-                  <td className="py-1 px-2 text-cyan-300 font-bold">{row.avviso}</td>
-                  <td className="py-1 px-2 font-sans text-slate-300 truncate max-w-[280px]">{row.testo_esteso}</td>
-                  <td className="py-1 px-2 text-slate-300">{row.sede_tecnica}</td>
-                  <td className="py-1 px-2 text-slate-400">{row.inizio_richiesta}</td>
-                  <td className="py-1 px-2 text-slate-400">{row.fine_richiesta}</td>
-                  <td className="py-1 px-2 text-emerald-400 font-bold">MECO</td>
-                  <td className="py-1 px-2 text-slate-400">{row.data_chiusura}</td>
-                  <td className="py-1 px-2 text-red-400 font-bold">(Ritardo 34 gg)</td>
-                  <td className="py-1 px-2 text-slate-400">-</td>
-                  <td className="py-1 px-2 text-slate-400">-</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+    </PbiCanvas>
   );
 };

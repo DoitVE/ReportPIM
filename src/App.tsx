@@ -88,7 +88,10 @@ export const App: React.FC = () => {
 
   // Le pagine replicate dal PBIR usano il canvas assoluto 1280x720 e devono
   // occupare tutto lo spazio disponibile, senza padding né spaziatura esterni.
-  const isCanvasPage = activeSection === 'avvisi_v5' || activeSection === 'dashboard_v5';
+  const isCanvasPage =
+    activeSection === 'avvisi_v5' ||
+    activeSection === 'dashboard_v5' ||
+    activeSection === 'cerca_sete_v5';
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#18191c] flex flex-col font-sans select-none text-slate-100">

@@ -1,0 +1,1442 @@
+================================================================================
+ REPORT "DIFFETTI ARMAMENTO" v3.0 - GUIDA COMPLETA AL LIVELLO DATI
+ Power Query M  |  Modello tabellare  |  DAX
+================================================================================
+
+SCOPO DI QUESTO FILE
+  Il documento descrive in modo COMPLETO e AUTOSUFFICIENTE il livello dati del
+  report Power BI "Report difetti armamento - v3.0": codice M delle query,
+  modello tabellare (tabelle, colonne, relazioni) e misure DAX.
+  Serve per modificare la web app React (ReportPIM) SENZA aprire la cartella
+  LEGACY/: il .pbix pesa ~12 MB, Model.bim/Model.txt ~3,7 MB ciascuno,
+  DaxModel.json ~0,9 MB e la guida PDF ~2 MB.
+
+  Da consultare SOLO per il layout grafico dei visual: LEGACY/SCREEN/*.png.
+  Qui NON sono descritte posizioni, dimensioni e stili delle pagine.
+
+  Contenuto in sintesi:
+    - 24 tabelle reali (modalità Import); le altre 67 tabelle sono
+      date table automatiche, nascoste e ininfluenti
+    - 9 relazioni effettive (più 66 relazioni automatiche data/ora, da ignorare)
+    - 2 misure DAX; tutti gli altri valori sono misure implicite (Somma/Conteggio)
+    - 24 query M complete, una per tabella
+
+INDICE
+  riga    82     1. ARCHITETTURA GENERALE
+  riga   110     2. MODELLO - TABELLE E COLONNE
+  riga   113         2.1   GPS
+  riga   147         2.2   IW67
+  riga   187         2.3   IH06
+  riga   249         2.4   LO-TR
+  riga   290         2.5   DATA_ORA
+  riga   295         2.6   CAOR_ODL
+  riga   303         2.7   CAOR_NTW
+  riga   311         2.8   IW39_STATO_ODL
+  riga   332         2.9   IW29_full
+  riga   357         2.10   ZSTMAIA1_full
+  riga   378         2.11   ZSTMAIA2_full
+  riga   404         2.12   ZSTMAIA7_full_VEM1
+  riga   422         2.13   ZSTMAIA7_full_VEM2
+  riga   440         2.14   ZSTMAIA7_full_VEM1+VEM2
+  riga   458         2.15   ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full
+  riga   591         2.16   ZAVVISI_TXT
+  riga   597         2.17   IK07_ATTIVO
+  riga   623         2.18   IK07_INATTIVO
+  riga   649         2.19   IK07_full
+  riga   676         2.20   ABBACO Bologna-Padova
+  riga   699         2.21   ABBACO Mestre-Quarto
+  riga   722         2.22   ABBACO Mestre-Treviso
+  riga   745         2.23   ABBACO Milano-Venezia SL
+  riga   768         2.24   ABBACO
+  riga   795     3. MODELLO - RELAZIONI
+  riga   854     4. MISURE DAX
+  riga   895     5. CODICE M (POWER QUERY) - COMPLETO
+  riga   915         M  1   GPS
+  riga   926         M  2   IW67
+  riga   963         M  3   IH06
+  riga   975         M  4   LO-TR
+  riga   988         M  5   DATA_ORA
+  riga   999         M  6   CAOR_ODL
+  riga  1012         M  7   CAOR_NTW
+  riga  1026         M  8   IW39_STATO_ODL
+  riga  1038         M  9   IW29_full
+  riga  1056         M 10   ZSTMAIA1_full
+  riga  1083         M 11   ZSTMAIA2_full
+  riga  1100         M 12   ZSTMAIA7_full_VEM1
+  riga  1117         M 13   ZSTMAIA7_full_VEM2
+  riga  1134         M 14   ZSTMAIA7_full_VEM1+VEM2
+  riga  1142         M 15   ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full
+  riga  1265         M 16   ZAVVISI_TXT
+  riga  1277         M 17   IK07_ATTIVO
+  riga  1288         M 18   IK07_INATTIVO
+  riga  1299         M 19   IK07_full
+  riga  1307         M 20   ABBACO Bologna-Padova
+  riga  1325         M 21   ABBACO Mestre-Quarto
+  riga  1341         M 22   ABBACO Mestre-Treviso
+  riga  1358         M 23   ABBACO Milano-Venezia SL
+  riga  1374         M 24   ABBACO
+  riga  1383     6. REGOLE, TRASFORMAZIONI E PARTICOLARITÀ
+  riga  1416     7. PAGINE DEL REPORT E CORRISPONDENZA CON LA WEB APP
+
+================================================================================
+ 1. ARCHITETTURA GENERALE
+================================================================================
+
+  Flusso:  file Excel/TXT esportati dal mainframe/SAP  ->  query M (Power Query)
+           ->  tabelle in modalità Import  ->  relazioni  ->  visual del report
+
+  Fonti esterne (percorsi originali scritti nelle query M):
+    C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\
+        DIFFETTI ARMAMENTO\REPORT\02 Base dati report\
+    File .xlsx/.XLSX letti con Excel.Workbook, oppure .txt letti con
+    Lines.FromBinary / Csv.Document (tabulatore o larghezza fissa).
+
+  Modello:
+    nome               : Report difetti armamento - v3_0
+    compatibilityLevel : 1606   (Power BI / compatibility mode)
+    culture            : it-IT
+    defaultPowerBIDataSourceVersion : powerBI_V3
+
+  Punti chiave:
+    - Nessuna colonna calcolata DAX: TUTTA la logica di trasformazione sta in M.
+    - Nessuna tabella calcolata DAX (a parte le date table automatiche).
+    - Nessun ruolo / RLS (row level security) definito.
+    - Data/ora automatica ATTIVA (annotazione __PBI_TimeIntelligenceEnabled): per
+      ogni colonna data/ora Power BI ha creato una tabella LocalDateTable_*
+      nascosta. È rumore: non va replicato nella web app.
+    - Annotazione PBI_QueryOrder presente: fissa l'ordine delle query.
+
+================================================================================
+ 2. MODELLO - TABELLE E COLONNE
+================================================================================
+
+--- 2.1  TABELLA: GPS
+    Colonne: 26   Modalità: Import   Origine: GPS.xlsx  /  foglio: Sheet1
+    Relazioni in ingresso:
+        <-- [IW67].[SeTe primo livello]   many -> one   crossFilter=single
+    Relazioni in uscita:
+        --> [LO-TR].[Sede tecnica]   one -> one   crossFilter=bothDirections
+    Colonne (nome : tipo : summarizeBy):
+        - Sede tecnica   :   string   :   none
+        - Definizione della sede tecnica   :   string   :   none
+        - Divis. ubic.   :   string   :   none
+        - Stato sistema   :   string   :   none
+        - Stato utente   :   string   :   none
+        - Km. Inizio   :   double   :   none
+        - Km. Fine   :   double   :   none
+        - Data modifica   :   string   :   none
+        - Autore modifica   :   string   :   none
+        - Centro di lavoro   :   string   :   none
+        - Località   :   string   :   none
+        - In funz. dal   :   string   :   none
+        - Data creazione   :   string   :   none
+        - Divisione pian.   :   string   :   none
+        - Lunghezza   :   int64   :   none   fmt=0
+        - Sede tecnica superiore   :   string   :   none
+        - Sede tecnica di riferimento   :   string   :   none
+        - Latitudine Fine   :   double   :   none
+        - Latitudine Inizio   :   double   :   none
+        - Longitudine Fine   :   double   :   none
+        - Altitudine Fine   :   double   :   none
+        - Altitudine Inizio   :   double   :   none
+        - Longitudine Inizio   :   double   :   none
+        - Numero   :   string   :   none
+        - Latitudine   :   double   :   none
+        - Longitudine   :   double   :   none
+
+--- 2.2  TABELLA: IW67
+    Colonne: 33   Modalità: Import   Origine: IW67.XLSX  /  foglio: Data
+    Relazioni in uscita:
+        --> [GPS].[Sede tecnica]   many -> one   crossFilter=single
+        --> [IH06].[Sede tecnica]   many -> one   crossFilter=bothDirections
+    Colonne (nome : tipo : summarizeBy):
+        - Avviso   :   int64   :   none   fmt=0
+        - Ordine   :   int64   :   sum   fmt=0
+        - Definizione della sede tecnica   :   string   :   none
+        - Km.   :   string   :   none
+        - Val. difetto   :   double   :   sum
+        - Testo   :   string   :   none
+        - Descrizione   :   string   :   none
+        - Sede tecnica   :   string   :   none
+        - SeTe primo livello   :   string   :   none
+        - Anno avviso   :   string   :   none
+        - Trimestre   :   string   :   none
+        - Stato   :   string   :   none
+        - Km. rif.   :   string   :   none
+        - Km inizio   :   string   :   none
+        - Km fine   :   string   :   none
+        - Cod. Stato   :   string   :   none
+        - Tipo   :   string   :   none
+        - Codice   :   string   :   none
+        - Data   :   dateTime   :   none   fmt=Short Date
+        - Latit iniz   :   int64   :   sum   fmt=0
+        - Long inizi   :   int64   :   sum   fmt=0
+        - CLavResp   :   string   :   none
+        - CD   :   string   :   none
+        - Data rif.   :   dateTime   :   none   fmt=Long Date
+        - DataEsec.   :   dateTime   :   none   fmt=Short Date
+        - In. pian.   :   dateTime   :   none   fmt=Long Date
+        - Mod. il   :   dateTime   :   none   fmt=Long Date
+        - Data cr.   :   dateTime   :   none   fmt=Long Date
+        - Fine pian.   :   dateTime   :   none   fmt=Long Date
+        - Data Fine Richiesta   :   dateTime   :   none   fmt=Short Date
+        - ST cons.   :   string   :   none
+        - Stato sist.   :   string   :   none
+        - Column1   :   string   :   none
+
+--- 2.3  TABELLA: IH06
+    Colonne: 55   Modalità: Import   Origine: IH06.XLSX  /  foglio: Sheet1
+    Relazioni in ingresso:
+        <-- [IW67].[Sede tecnica]   many -> one   crossFilter=bothDirections
+        <-- [ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full].[Tratta_definitiva]   many -> one   crossFilter=single
+    Colonne (nome : tipo : summarizeBy):
+        - Sede tecnica   :   string   :   none
+        - Definizione della sede tecnica   :   string   :   none
+        - Divis. ubic.   :   string   :   none
+        - Stato sistema   :   string   :   none
+        - Stato utente   :   string   :   none
+        - Km. Inizio   :   double   :   sum
+        - Km. Fine   :   double   :   sum
+        - Data modifica   :   dateTime   :   none   fmt=Long Date
+        - Autore modifica   :   string   :   none
+        - Centro di lavoro   :   string   :   none
+        - Località   :   string   :   none
+        - In funz. dal   :   dateTime   :   none   fmt=Long Date
+        - Data creazione   :   dateTime   :   none   fmt=Long Date
+        - Divisione pian.   :   string   :   none
+        - Lunghezza   :   string   :   none
+        - Sede tecnica di riferimento   :   string   :   none
+        - Telefono   :   string   :   none
+        - Centro lavoro resp.   :   string   :   none
+        - Tipo di oggetto   :   string   :   none
+        - Sistema d'identif.   :   string   :   none
+        - Altezza minima L.d.C. [m]   :   double   :   sum
+        - Autore dell'ultima modifica   :   string   :   none
+        - Base assoluta   :   string   :   none
+        - Bin.   :   string   :   none
+        - Binario AV/AC   :   string   :   none
+        - Binario Allegato VI.12   :   string   :   none
+        - Binario elettrificato   :   string   :   none
+        - Classe linea per vigilanza   :   int64   :   sum   fmt=0
+        - Codice binario SAS   :   string   :   none
+        - Data dell'ultima modifica   :   int64   :   sum   fmt=0
+        - Div. pian. della manutenzione   :   string   :   none
+        - Intercon. circol. da treni   :   string   :   none
+        - Interconnessione   :   string   :   none
+        - Linea di appartenenza   :   string   :   none
+        - Lungh. di stazionamento [m]   :   int64   :   sum   fmt=0
+        - Lunghezza del binario [Km]   :   double   :   sum
+        - Monitoraggio Carico Dinamico   :   string   :   none
+        - Monitoraggio temp. rotaia   :   string   :   none
+        - Presenza Raccordo in Tratta   :   string   :   none
+        - Profilo Manutentivo L94 (BC)   :   string   :   none
+        - Progr. Km monitoraggio temp.   :   double   :   sum
+        - Progr. Km. altezza min. L.d.C.   :   double   :   sum
+        - Sent. percorribile piedi   :   string   :   none
+        - Tipo L.d.C.   :   string   :   none
+        - Velocità Rango A   :   int64   :   sum   fmt=0
+        - Velocità Rango B   :   int64   :   sum   fmt=0
+        - Velocità Rango C   :   int64   :   sum   fmt=0
+        - Velocità Rango P   :   int64   :   sum   fmt=0
+        - n. Regolazioni Automatiche   :   int64   :   sum   fmt=0
+        - n. dev. manovr. mano centr.   :   int64   :   sum   fmt=0
+        - n. deviatoi elettrici   :   int64   :   sum   fmt=0
+        - n. di sezioni marcia DX   :   int64   :   sum   fmt=0
+        - n. di sezioni marcia SX   :   int64   :   sum   fmt=0
+        - n. passatoie   :   int64   :   sum   fmt=0
+        - n. tot deviatoi/inters. centr.   :   int64   :   sum   fmt=0
+
+--- 2.4  TABELLA: LO-TR
+    Colonne: 33   Modalità: Import   Origine: LO-TR.xlsx  /  foglio: LO-TR
+    Relazioni in ingresso:
+        <-- [GPS].[Sede tecnica]   one -> one   crossFilter=bothDirections
+        <-- [ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full].[Tratta_definitiva]   many -> one   crossFilter=single
+        <-- [ABBACO].[Codice Tratta INRETE]   many -> one   crossFilter=single
+    Colonne (nome : tipo : summarizeBy):
+        - Sede tecnica   :   string   :   none
+        - Località/Tratta   :   string   :   none
+        - Divis. ubic.   :   string   :   none
+        - Stato utente   :   string   :   none
+        - Stato sistema   :   string   :   none
+        - Km. Inizio   :   double   :   sum
+        - CdC   :   int64   :   sum   fmt=0
+        - Codice linea InRete   :   string   :   none
+        - Linea InRete   :   string   :   none
+        - Linea Profilo   :   string   :   none
+        - LVU   :   string   :   none
+        - ISU   :   string   :   none
+        - TEU   :   string   :   none
+        - Lavori Armamento   :   string   :   none
+        - Impianti di Sicurezz   :   string   :   none
+        - Trazione Elettrica   :   string   :   none
+        - Linea  Primaria   :   string   :   none
+        - Luce/Forza motrice   :   string   :   none
+        - Sotto Stazione Elett   :   string   :   none
+        - Spec. Sotto Stazione   :   string   :   none
+        - Spec. Telecomandi SS   :   string   :   none
+        - Spec. Diagnostica   :   string   :   none
+        - Spec. Diag. Armament   :   string   :   none
+        - Spec. Cant. Meccaniz   :   string   :   none
+        - Spec. Ponti   :   string   :   none
+        - Spec. IS Attivazioni   :   string   :   none
+        - Spec. IS Telecomandi   :   string   :   none
+        - Spec. IS Centraline/   :   string   :   none
+        - Spec. Sup.Fis.Trasm.   :   string   :   none
+        - Spec. Alta Frequenza   :   string   :   none
+        - Spec. Trasmissione D   :   string   :   none
+        - Spec. Central.Tel.Au   :   string   :   none
+        - Spec. Radiotelefonia   :   string   :   none
+
+--- 2.5  TABELLA: DATA_ORA
+    Colonne: 1   Modalità: Import   Origine: DATA_ORA.xlsx  /  foglio: Foglio1
+    Colonne (nome : tipo : summarizeBy):
+        - Data e ora scarico dati:   :   dateTime   :   none   fmt=dd/mm/yyyy hh:nn
+
+--- 2.6  TABELLA: CAOR_ODL
+    Colonne: 4   Modalità: Import   Origine: CAOR_ODL.xlsx  /  foglio: CAOR_ODL
+    Colonne (nome : tipo : summarizeBy):
+        - Ord. dest.   :   string   :   none
+        - Data prima cons. su OdL   :   dateTime   :   none   fmt=Short Date
+        - Data ultima cons. su OdL   :   dateTime   :   none   fmt=Short Date
+        - Ore cons. su OdL   :   double   :   none
+
+--- 2.7  TABELLA: CAOR_NTW
+    Colonne: 4   Modalità: Import   Origine: CAOR_NTW.xlsx  /  foglio: CAOR_NTW
+    Colonne (nome : tipo : summarizeBy):
+        - Data prima cons. su NTW   :   string   :   none
+        - Data ultima cons. su NTW   :   string   :   none
+        - Ore cons. su Ntw   :   double   :   sum
+        - Networl-C. lav.   :   string   :   none
+
+--- 2.8  TABELLA: IW39_STATO_ODL
+    Colonne: 17   Modalità: Import   Origine: IW39_STATO_ODL.XLSX  /  foglio: Sheet1
+    Colonne (nome : tipo : summarizeBy):
+        - Centro lavoro resp.   :   string   :   none
+        - Divisione   :   string   :   none
+        - Ordine   :   int64   :   sum   fmt=0
+        - Tipo di ordine   :   int64   :   sum   fmt=0
+        - Data inizio cardine   :   dateTime   :   none   fmt=Long Date
+        - Tsto br.   :   string   :   none
+        - Stato sistema   :   string   :   none
+        - Costi tot. effettivi   :   double   :   sum
+        - Costi totali pian.   :   double   :   sum
+        - Data fine cardine   :   dateTime   :   none   fmt=Long Date
+        - Data inizio eff.   :   dateTime   :   none   fmt=Long Date
+        - Fine schedulata   :   dateTime   :   none   fmt=Long Date
+        - Inizio schedulato   :   dateTime   :   none   fmt=Long Date
+        - Sede tecnica   :   string   :   none
+        - Tot. pianificato   :   double   :   sum
+        - Totale (effettivo)   :   double   :   sum
+        - Stato OdL   :   string   :   none
+
+--- 2.9  TABELLA: IW29_full
+    Colonne: 21   Modalità: Import   Origine: IW29_full.txt  (file di testo, encoding 1252)
+    Colonne (nome : tipo : summarizeBy):
+        - Tp.   :   string   :   none
+        - Avviso   :   string   :   none
+        - Descrizione   :   string   :   none
+        - Ordine   :   string   :   none
+        - Sede tecnica   :   string   :   none
+        - FineRich.   :   dateTime   :   none   fmt=Long Date
+        - In. rich.   :   dateTime   :   none   fmt=Long Date
+        - St.pag.   :   string   :   none
+        - St.sist.   :   string   :   none
+        - St.utente   :   string   :   none
+        - Autore   :   string   :   none
+        - Da   :   string   :   none
+        - Aut.avviso   :   string   :   none
+        - Data chiusura   :   dateTime   :   none   fmt=Long Date
+        - Data avviso   :   dateTime   :   none   fmt=Long Date
+        - Data cr.   :   dateTime   :   none   fmt=Long Date
+        - Data rif.   :   dateTime   :   none   fmt=Long Date
+        - Data modifica   :   dateTime   :   none   fmt=Long Date
+        - Dt.rif.cl.   :   dateTime   :   none   fmt=Long Date
+        - Network   :   string   :   none
+        - Op.   :   string   :   none
+
+--- 2.10  TABELLA: ZSTMAIA1_full
+    Colonne: 17   Modalità: Import   Origine: ZSTMAIA1_full.xlsx  /  foglio: Data
+    Colonne (nome : tipo : summarizeBy):
+        - Tratta   :   string   :   none
+        - Dev.   :   string   :   none
+        - Bin.   :   string   :   none
+        - Fila   :   string   :   none
+        - Km linea   :   string   :   none
+        - Pdm   :   string   :   none
+        - Tipo difetto   :   string   :   none
+        - Classe provvedimento   :   string   :   none
+        - Val. (%/mm)   :   string   :   none
+        - Prof. Dif.   :   string   :   none
+        - Pos. Dif   :   string   :   none
+        - Data Scoperta   :   string   :   none
+        - Tolto d'opera   :   string   :   none
+        - Data tolto d'opera   :   dateTime   :   none   fmt=Long Date
+        - Tipo Arm.   :   string   :   none
+        - Osservazioni   :   string   :   none
+        - Data Agg.   :   dateTime   :   none   fmt=Long Date
+
+--- 2.11  TABELLA: ZSTMAIA2_full
+    Colonne: 22   Modalità: Import   Origine: ZSTMAIA2_full.xlsx  /  foglio: Data
+    Colonne (nome : tipo : summarizeBy):
+        - Data scoperta   :   dateTime   :   none   fmt=Long Date
+        - Cod. linea   :   string   :   none
+        - Cod. tratta   :   string   :   none
+        - Dev.   :   string   :   none
+        - Bin   :   string   :   none
+        - km linea   :   string   :   none
+        - Pdm   :   string   :   none
+        - Ubi lin.   :   string   :   none
+        - T. tratta ragg. fug.   :   string   :   none
+        - Fila   :   string   :   none
+        - Tipo difetto   :   string   :   none
+        - Classe prov.   :   string   :   none
+        - Valore (%/mm)   :   string   :   none
+        - Posizione difetto   :   string   :   none
+        - Tipo Sald.   :   string   :   none
+        - Data esec. saldatura   :   string   :   none
+        - Posizione sezione   :   string   :   none
+        - Sald. in gar.   :   string   :   none
+        - Tolto d'opera   :   string   :   none
+        - Data tolto d'opera   :   dateTime   :   none   fmt=Long Date
+        - Eseguito da   :   string   :   none
+        - ID saldatore   :   string   :   none
+
+--- 2.12  TABELLA: ZSTMAIA7_full_VEM1
+    Colonne: 14   Modalità: Import   Origine: ZSTMAIA7_full_VEM1.xlsx  /  foglio: Data
+    Colonne (nome : tipo : summarizeBy):
+        - Data scoperta   :   dateTime   :   none   fmt=Long Date
+        - Cod. linea   :   string   :   none
+        - Cod. SeTe   :   string   :   none
+        - Bin.   :   string   :   none
+        - Fila   :   string   :   none
+        - km linea   :   string   :   none
+        - Tipo difetto   :   string   :   none
+        - Classe porvv.   :   string   :   none
+        - Tolto d'opera   :   string   :   none
+        - Data tolto d'opera   :   dateTime   :   none   fmt=Long Date
+        - Centro di lavoro   :   string   :   none
+        - Pdm   :   string   :   none
+        - N. doc. di misura   :   string   :   none
+        - Avviso   :   string   :   none
+
+--- 2.13  TABELLA: ZSTMAIA7_full_VEM2
+    Colonne: 14   Modalità: Import   Origine: ZSTMAIA7_full_VEM2.xlsx  /  foglio: Data
+    Colonne (nome : tipo : summarizeBy):
+        - Data scoperta   :   dateTime   :   none   fmt=Long Date
+        - Cod. linea   :   string   :   none
+        - Cod. SeTe   :   string   :   none
+        - Bin.   :   string   :   none
+        - Fila   :   string   :   none
+        - km linea   :   string   :   none
+        - Tipo difetto   :   string   :   none
+        - Classe porvv.   :   string   :   none
+        - Tolto d'opera   :   string   :   none
+        - Data tolto d'opera   :   dateTime   :   none   fmt=Long Date
+        - Centro di lavoro   :   string   :   none
+        - Pdm   :   string   :   none
+        - N. doc. di misura   :   string   :   none
+        - Avviso   :   string   :   none
+
+--- 2.14  TABELLA: ZSTMAIA7_full_VEM1+VEM2
+    Colonne: 14   Modalità: Import   Origine: UNIONE di altre query (Table.Combine)
+    Colonne (nome : tipo : summarizeBy):
+        - Data scoperta   :   dateTime   :   none   fmt=Long Date
+        - Cod. linea   :   string   :   none
+        - Cod. SeTe   :   string   :   none
+        - Bin.   :   string   :   none
+        - Fila   :   string   :   none
+        - km linea   :   string   :   none
+        - Tipo difetto   :   string   :   none
+        - Classe porvv.   :   string   :   none
+        - Tolto d'opera   :   string   :   none
+        - Data tolto d'opera   :   dateTime   :   none   fmt=Long Date
+        - Centro di lavoro   :   string   :   none
+        - Pdm   :   string   :   none
+        - N. doc. di misura   :   string   :   none
+        - Avviso   :   string   :   none
+
+--- 2.15  TABELLA: ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full
+    Colonne: 124   Modalità: Import   Origine: derivata da altre query
+    Relazioni in uscita:
+        --> [IK07_full].[Punto di misura]   many -> one   crossFilter=single
+        --> [IK07_INATTIVO].[Punto di misura]   many -> one   crossFilter=single
+        --> [LO-TR].[Sede tecnica]   many -> one   crossFilter=single
+        --> [IH06].[Sede tecnica]   many -> one   crossFilter=single
+    Colonne (nome : tipo : summarizeBy):
+        - Tratta   :   string   :   none
+        - Dev.   :   string   :   none
+        - Bin.   :   string   :   none
+        - Fila   :   string   :   none
+        - Km linea   :   string   :   none
+        - Pdm   :   string   :   none
+        - Tipo difetto   :   string   :   none
+        - Classe provvedimento   :   string   :   none
+        - Val. (%/mm)   :   string   :   none
+        - Prof. Dif.   :   string   :   none
+        - Pos. Dif   :   string   :   none
+        - Data Scoperta   :   dateTime   :   none   fmt=Short Date
+        - Tolto d'opera   :   string   :   none
+        - Data tolto d'opera   :   dateTime   :   none   fmt=Short Date
+        - Tipo Arm.   :   string   :   none
+        - Osservazioni   :   string   :   none
+        - Data Agg.   :   dateTime   :   none   fmt=Short Date
+        - ZSTMAIA2_full.Data scoperta   :   dateTime   :   none   fmt=Long Date
+        - ZSTMAIA2_full.Cod. linea   :   string   :   none
+        - ZSTMAIA2_full.Cod. tratta   :   string   :   none
+        - ZSTMAIA2_full.Dev.   :   string   :   none
+        - ZSTMAIA2_full.Bin   :   string   :   none
+        - ZSTMAIA2_full.km linea   :   string   :   none
+        - ZSTMAIA2_full.Pdm   :   string   :   none
+        - ZSTMAIA2_full.Ubi lin.   :   string   :   none
+        - ZSTMAIA2_full.T. tratta ragg. fug.   :   string   :   none
+        - ZSTMAIA2_full.Fila   :   string   :   none
+        - ZSTMAIA2_full.Tipo difetto   :   string   :   none
+        - ZSTMAIA2_full.Classe prov.   :   string   :   none
+        - ZSTMAIA2_full.Valore (%/mm)   :   string   :   none
+        - ZSTMAIA2_full.Posizione difetto   :   string   :   none
+        - ZSTMAIA2_full.Tipo Sald.   :   string   :   none
+        - ZSTMAIA2_full.Data esec. saldatura   :   string   :   none
+        - ZSTMAIA2_full.Posizione sezione   :   string   :   none
+        - ZSTMAIA2_full.Sald. in gar.   :   string   :   none
+        - ZSTMAIA2_full.Tolto d'opera   :   string   :   none
+        - ZSTMAIA2_full.Data tolto d'opera   :   dateTime   :   none   fmt=Long Date
+        - ZSTMAIA2_full.Eseguito da   :   string   :   none
+        - ZSTMAIA2_full.ID saldatore   :   string   :   none
+        - ZSTMAIA7_full_VEM1+VEM2.Data scoperta   :   dateTime   :   none   fmt=Short Date
+        - ZSTMAIA7_full_VEM1+VEM2.Cod. linea   :   string   :   none
+        - ZSTMAIA7_full_VEM1+VEM2.Cod. SeTe   :   string   :   none
+        - ZSTMAIA7_full_VEM1+VEM2.Bin.   :   string   :   none
+        - ZSTMAIA7_full_VEM1+VEM2.Fila   :   string   :   none
+        - ZSTMAIA7_full_VEM1+VEM2.km linea   :   string   :   none
+        - ZSTMAIA7_full_VEM1+VEM2.Tipo difetto   :   string   :   none
+        - ZSTMAIA7_full_VEM1+VEM2.Classe porvv.   :   string   :   none
+        - ZSTMAIA7_full_VEM1+VEM2.Tolto d'opera   :   string   :   none
+        - ZSTMAIA7_full_VEM1+VEM2.Data tolto d'opera   :   dateTime   :   none   fmt=Short Date
+        - ZSTMAIA7_full_VEM1+VEM2.Centro di lavoro   :   string   :   none
+        - ZSTMAIA7_full_VEM1+VEM2.Pdm   :   string   :   none
+        - ZSTMAIA7_full_VEM1+VEM2.N. doc. di misura   :   string   :   none
+        - ZSTMAIA7_full_VEM1+VEM2.Avviso   :   string   :   none
+        - IW29_full.Tp.   :   string   :   none
+        - IW29_full.Avviso   :   string   :   none
+        - IW29_full.Descrizione   :   string   :   none
+        - IW29_full.Ordine   :   string   :   none
+        - IW29_full.Sede tecnica   :   string   :   none
+        - IW29_full.FineRich.   :   dateTime   :   none   fmt=Short Date
+        - IW29_full.In. rich.   :   dateTime   :   none   fmt=Short Date
+        - IW29_full.St.pag.   :   string   :   none
+        - IW29_full.St.sist.   :   string   :   none
+        - IW29_full.St.utente   :   string   :   none
+        - IW29_full.Autore   :   string   :   none
+        - IW29_full.Da   :   string   :   none
+        - IW29_full.Aut.avviso   :   string   :   none
+        - IW29_full.Data chiusura   :   dateTime   :   none   fmt=Short Date
+        - IW29_full.Data avviso   :   dateTime   :   none   fmt=Long Date
+        - IW29_full.Data cr.   :   dateTime   :   none   fmt=Short Date
+        - IW29_full.Data rif.   :   dateTime   :   none   fmt=Long Date
+        - IW29_full.Data modifica   :   dateTime   :   none   fmt=Short Date
+        - IW29_full.Dt.rif.cl.   :   dateTime   :   none   fmt=Long Date
+        - IW29_full.Network   :   string   :   none
+        - IW29_full.Op.   :   string   :   none
+        - Avviso aperto   :   int64   :   sum   fmt=0
+        - Pdm aperto   :   int64   :   sum   fmt=0
+        - Avviso aperto o Pdm aperto   :   int64   :   sum   fmt=0
+        - Classificazione stato   :   string   :   none
+        - Stato scadenza   :   string   :   none
+        - ZAVVISI_TXT.Testo Esteso   :   string   :   none
+        - Cod. stato scadenza   :   string   :   none
+        - PdM chiuso in ritardo   :   string   :   none
+        - Avv. chiuso in ritardo   :   string   :   none
+        - Data chiusura avv. < Data inizio avv.   :   string   :   none
+        - Data Tolto d'opera < Data scoperta   :   string   :   none
+        - Data Tolto d'opera futura   :   string   :   none
+        - Data chiusura avv. futura   :   string   :   none
+        - Ritardo PdM   :   string   :   none
+        - Ritardo Avv.   :   string   :   none
+        - IK07_full.Autore modifica   :   string   :   none
+        - IK07_full.Punto di misura   :   string   :   none
+        - IK07_full.Descrizione   :   string   :   none
+        - IK07_full.Sede tecnica   :   string   :   none
+        - IK07_full.Tipo punto di mis.   :   string   :   none
+        - IK07_full.Gruppo codici   :   string   :   none
+        - IK07_full.Pos. misura   :   string   :   none
+        - IK07_full.Punto mis. inattivo   :   string   :   none
+        - IK07_full.Tipo catalogo   :   int64   :   sum   fmt=0
+        - IK07_full.Chiave lingua   :   string   :   none
+        - IK07_full.Creato da   :   int64   :   sum   fmt=0
+        - IK07_full.Data creazione   :   dateTime   :   none   fmt=Short Date
+        - IK07_full.Data modifica   :   dateTime   :   none   fmt=Long Date
+        - IK07_full.Mandante   :   int64   :   sum   fmt=0
+        - IK07_full.N. ogg. punto mis.   :   string   :   none
+        - IK07_full.Ind.punto mis. rif.   :   string   :   none
+        - IK07_full.Indic. di canc.   :   string   :   none
+        - IK07_full.Punto mis. è contat.   :   string   :   none
+        - IK07_full.Punto mis. rif.   :   string   :   none
+        - IK07_full.Tsto   :   string   :   none
+        - PdM non visibile in ZSTMAIA   :   string   :   none
+        - PdM_definitivo   :   string   :   none
+        - PdM_definitivo_clone   :   string   :   none
+        - Osservazioni_definitivo   :   string   :   none
+        - Sede_tecnica_definitiva   :   string   :   none
+        -  Tolto d'opera_definitivo   :   string   :   none
+        - Anno   :   int64   :   sum   fmt=0
+        - Anomalie PdM   :   string   :   none
+        - Avviso chiuso   :   string   :   none
+        - Tratta_definitiva   :   string   :   none
+        - Classe_prov_definitiva   :   string   :   none
+        - Network/OdL agganciato   :   string   :   none
+        - Chiave (PdM o Avviso)   :   string   :   none
+        - Presenza PdM e Avviso   :   string   :   none
+        - IW29_full.Avviso_clone   :   string   :   none
+
+--- 2.16  TABELLA: ZAVVISI_TXT
+    Colonne: 2   Modalità: Import   Origine: ZAVVISI_TXT.xlsx  /  foglio: Data
+    Colonne (nome : tipo : summarizeBy):
+        - Numero avviso   :   string   :   none
+        - Testo Esteso   :   string   :   none
+
+--- 2.17  TABELLA: IK07_ATTIVO
+    Colonne: 20   Modalità: Import   Origine: IK07_attivo.xlsx  /  foglio: Data
+    Relazioni in uscita:
+        --> [IK07_full].[Punto di misura]   one -> one   crossFilter=bothDirections
+    Colonne (nome : tipo : summarizeBy):
+        - Autore modifica   :   int64   :   sum   fmt=0
+        - Punto di misura   :   string   :   none
+        - Descrizione   :   string   :   none
+        - Sede tecnica   :   string   :   none
+        - Tipo punto di mis.   :   string   :   none
+        - Gruppo codici   :   string   :   none
+        - Pos. misura   :   string   :   none
+        - Punto mis. inattivo   :   string   :   none
+        - Tipo catalogo   :   int64   :   sum   fmt=0
+        - Chiave lingua   :   string   :   none
+        - Creato da   :   int64   :   sum   fmt=0
+        - Data creazione   :   dateTime   :   none   fmt=Long Date
+        - Data modifica   :   dateTime   :   none   fmt=Long Date
+        - Mandante   :   int64   :   sum   fmt=0
+        - N. ogg. punto mis.   :   string   :   none
+        - Ind.punto mis. rif.   :   string   :   none
+        - Indic. di canc.   :   string   :   none
+        - Punto mis. è contat.   :   string   :   none
+        - Punto mis. rif.   :   string   :   none
+        - Tsto   :   string   :   none
+
+--- 2.18  TABELLA: IK07_INATTIVO
+    Colonne: 20   Modalità: Import   Origine: IK07_inattivo.xlsx  /  foglio: Data
+    Relazioni in ingresso:
+        <-- [ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full].[IK07_full.Punto di misura]   many -> one   crossFilter=single
+    Colonne (nome : tipo : summarizeBy):
+        - Autore modifica   :   string   :   none
+        - Punto di misura   :   string   :   none
+        - Descrizione   :   string   :   none
+        - Sede tecnica   :   string   :   none
+        - Tipo punto di mis.   :   string   :   none
+        - Gruppo codici   :   string   :   none
+        - Pos. misura   :   string   :   none
+        - Punto mis. inattivo   :   string   :   none
+        - Tipo catalogo   :   int64   :   sum   fmt=0
+        - Chiave lingua   :   string   :   none
+        - Creato da   :   int64   :   sum   fmt=0
+        - Data creazione   :   dateTime   :   none   fmt=Long Date
+        - Data modifica   :   dateTime   :   none   fmt=Long Date
+        - Mandante   :   int64   :   sum   fmt=0
+        - N. ogg. punto mis.   :   string   :   none
+        - Ind.punto mis. rif.   :   string   :   none
+        - Indic. di canc.   :   string   :   none
+        - Punto mis. è contat.   :   string   :   none
+        - Punto mis. rif.   :   string   :   none
+        - Tsto   :   string   :   none
+
+--- 2.19  TABELLA: IK07_full
+    Colonne: 20   Modalità: Import   Origine: UNIONE di altre query (Table.Combine)
+    Relazioni in ingresso:
+        <-- [IK07_ATTIVO].[Punto di misura]   one -> one   crossFilter=bothDirections
+        <-- [ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full].[IK07_full.Punto di misura]   many -> one   crossFilter=single
+    Colonne (nome : tipo : summarizeBy):
+        - Autore modifica   :   string   :   none
+        - Punto di misura   :   string   :   none
+        - Descrizione   :   string   :   none
+        - Sede tecnica   :   string   :   none
+        - Tipo punto di mis.   :   string   :   none
+        - Gruppo codici   :   string   :   none
+        - Pos. misura   :   string   :   none
+        - Punto mis. inattivo   :   string   :   none
+        - Tipo catalogo   :   int64   :   sum   fmt=0
+        - Chiave lingua   :   string   :   none
+        - Creato da   :   int64   :   sum   fmt=0
+        - Data creazione   :   dateTime   :   none   fmt=Long Date
+        - Data modifica   :   dateTime   :   none   fmt=Long Date
+        - Mandante   :   int64   :   sum   fmt=0
+        - N. ogg. punto mis.   :   string   :   none
+        - Ind.punto mis. rif.   :   string   :   none
+        - Indic. di canc.   :   string   :   none
+        - Punto mis. è contat.   :   string   :   none
+        - Punto mis. rif.   :   string   :   none
+        - Tsto   :   string   :   none
+
+--- 2.20  TABELLA: ABBACO Bologna-Padova
+    Colonne: 19   Modalità: Import   Origine: ABBA.CO.AGGIORNATO-RPC +++USARE QUESTO+++.xlsx  /  foglio: Bologna-Padova
+    Colonne (nome : tipo : summarizeBy):
+        - Codice Tratta INRETE   :   string   :   none
+        - Tratta (descrizione)   :   string   :   none
+        - Binario (P/D/L)   :   string   :   none
+        - Inizio   :   string   :   none
+        - Fine   :   string   :   none
+        - chiave_RL   :   string   :   none
+        - rid_vel (km/h)   :   string   :   none
+        - Motivo   :   string   :   none
+        - Titolare del rallentamento (matr.)   :   string   :   none
+        - Data inizio   :   dateTime   :   none   fmt=Long Date
+        - Ora inizio   :   string   :   none
+        - Avviso Avaria   :   string   :   none
+        - EA   :   string   :   none
+        - CODICE ABBATTIMENTO    :   string   :   none
+        - UM   :   string   :   none
+        - Pianificazione   :   dateTime   :   none   fmt=Long Date
+        - Data fine   :   string   :   none
+        - Ora fine   :   string   :   none
+        - Linea   :   string   :   none
+
+--- 2.21  TABELLA: ABBACO Mestre-Quarto
+    Colonne: 19   Modalità: Import   Origine: ABBA.CO.AGGIORNATO-RPC +++USARE QUESTO+++.xlsx  /  foglio: Mestre-Quarto
+    Colonne (nome : tipo : summarizeBy):
+        - Codice Tratta INRETE   :   string   :   none
+        - Tratta (descrizione)   :   string   :   none
+        - Binario (P/D/L)   :   string   :   none
+        - Inizio   :   string   :   none
+        - Fine   :   string   :   none
+        - chiave_RL   :   string   :   none
+        - rid_vel (km/h)   :   string   :   none
+        - Motivo   :   string   :   none
+        - Titolare del rallentamento (matr.)   :   string   :   none
+        - Data inizio   :   string   :   none
+        - Ora inizio   :   string   :   none
+        - Avviso Avaria   :   string   :   none
+        - EA   :   string   :   none
+        - CODICE ABBATTIMENTO    :   string   :   none
+        - UM   :   string   :   none
+        - Pianificazione   :   string   :   none
+        - Data fine   :   string   :   none
+        - Ora fine   :   string   :   none
+        - Linea   :   string   :   none
+
+--- 2.22  TABELLA: ABBACO Mestre-Treviso
+    Colonne: 19   Modalità: Import   Origine: ABBA.CO.AGGIORNATO-RPC +++USARE QUESTO+++.xlsx  /  foglio: Mestre-Treviso
+    Colonne (nome : tipo : summarizeBy):
+        - Codice Tratta INRETE   :   string   :   none
+        - Tratta (descrizione)   :   string   :   none
+        - Binario (P/D/L)   :   string   :   none
+        - Inizio   :   string   :   none
+        - Fine   :   string   :   none
+        - chiave_RL   :   string   :   none
+        - rid_vel (km/h)   :   string   :   none
+        - Motivo   :   string   :   none
+        - Titolare del rallentamento (matr.)   :   string   :   none
+        - Data inizio   :   dateTime   :   none   fmt=Long Date
+        - Ora inizio   :   dateTime   :   none   fmt=General Date
+        - Avviso Avaria   :   string   :   none
+        - EA   :   string   :   none
+        - CODICE ABBATTIMENTO    :   string   :   none
+        - UM   :   string   :   none
+        - Pianificazione   :   string   :   none
+        - Data fine   :   string   :   none
+        - Ora fine   :   string   :   none
+        - Linea   :   string   :   none
+
+--- 2.23  TABELLA: ABBACO Milano-Venezia SL
+    Colonne: 19   Modalità: Import   Origine: ABBA.CO.AGGIORNATO-RPC +++USARE QUESTO+++.xlsx  /  foglio: Milano-Venezia SL
+    Colonne (nome : tipo : summarizeBy):
+        - Codice Tratta INRETE   :   string   :   none
+        - Tratta (descrizione)   :   string   :   none
+        - Binario (P/D/L)   :   string   :   none
+        - Inizio   :   string   :   none
+        - Fine   :   string   :   none
+        - chiave_RL   :   string   :   none
+        - rid_vel   :   string   :   none
+        - Motivo   :   string   :   none
+        - Titolare del rallentamento (matr.)   :   string   :   none
+        - Data inizio   :   dateTime   :   none   fmt=Long Date
+        - Ora inizio   :   dateTime   :   none   fmt=General Date
+        - Avviso Avaria   :   string   :   none
+        - EA   :   string   :   none
+        - CODICE ABBATTIMENTO    :   string   :   none
+        - UM   :   string   :   none
+        - Pianificazione   :   string   :   none
+        - Data fine   :   string   :   none
+        - Ora fine   :   string   :   none
+        - Linea   :   string   :   none
+
+--- 2.24  TABELLA: ABBACO
+    Colonne: 20   Modalità: Import   Origine: UNIONE di altre query (Table.Combine)
+    Relazioni in uscita:
+        --> [LO-TR].[Sede tecnica]   many -> one   crossFilter=single
+    Colonne (nome : tipo : summarizeBy):
+        - Codice Tratta INRETE   :   string   :   none
+        - Tratta (descrizione)   :   string   :   none
+        - Binario (P/D/L)   :   string   :   none
+        - Inizio   :   string   :   none
+        - Fine   :   string   :   none
+        - chiave_RL   :   string   :   none
+        - rid_vel (km/h)   :   string   :   none
+        - Motivo   :   string   :   none
+        - Titolare del rallentamento (matr.)   :   string   :   none
+        - Data inizio   :   string   :   none
+        - Ora inizio   :   string   :   none
+        - Avviso Avaria   :   string   :   none
+        - EA   :   string   :   none
+        - CODICE ABBATTIMENTO    :   string   :   none
+        - UM   :   string   :   none
+        - Pianificazione   :   string   :   none
+        - Data fine   :   string   :   none
+        - Ora fine   :   string   :   none
+        - Linea   :   string   :   none
+        - rid_vel   :   string   :   none
+
+================================================================================
+ 3. MODELLO - RELAZIONI
+================================================================================
+
+  Relazioni effettivamente usate dai visual (9):
+
+    [IW67].[SeTe primo livello]
+         ->  [GPS].[Sede tecnica]
+         cardinalità many -> one   crossFilter single   attiva true
+         nome: 5b2cdb64-34e7-db70-8fb2-28fa394b7dcd
+
+    [IW67].[Sede tecnica]
+         ->  [IH06].[Sede tecnica]
+         cardinalità many -> one   crossFilter bothDirections   attiva true
+         nome: 6954b7f2-3dee-b0b9-a866-266ab18f9be2
+
+    [GPS].[Sede tecnica]
+         ->  [LO-TR].[Sede tecnica]
+         cardinalità one -> one   crossFilter bothDirections   attiva true
+         nome: AutoDetected_fbc28972-7990-4f90-abd8-4c577bdd98a0
+
+    [IK07_ATTIVO].[Punto di misura]
+         ->  [IK07_full].[Punto di misura]
+         cardinalità one -> one   crossFilter bothDirections   attiva true
+         nome: AutoDetected_4180e179-e09f-4f76-8de5-ad9b9f29ac57
+
+    [ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full].[IK07_full.Punto di misura]
+         ->  [IK07_full].[Punto di misura]
+         cardinalità many -> one   crossFilter single   attiva true
+         nome: AutoDetected_85324aaa-f720-429d-8b64-5e34e7c1e900
+
+    [ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full].[IK07_full.Punto di misura]
+         ->  [IK07_INATTIVO].[Punto di misura]
+         cardinalità many -> one   crossFilter single   attiva true
+         nome: AutoDetected_1164d5b8-dee8-40bf-8ff4-7b7bdb02a1f6
+
+    [ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full].[Tratta_definitiva]
+         ->  [LO-TR].[Sede tecnica]
+         cardinalità many -> one   crossFilter single   attiva true
+         nome: d6c1ff1f-6e42-1f48-721b-205dc8965d7b
+
+    [ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full].[Tratta_definitiva]
+         ->  [IH06].[Sede tecnica]
+         cardinalità many -> one   crossFilter single   attiva true
+         nome: 6b55281a-aa59-12ee-f7fa-d1d3550548ac
+
+    [ABBACO].[Codice Tratta INRETE]
+         ->  [LO-TR].[Sede tecnica]
+         cardinalità many -> one   crossFilter single   attiva true
+         nome: 60269eb2-199f-6b20-66f1-1801e0075910
+
+  Attenzione: le relazioni con crossFilter=bothDirections filtrano nei due sensi,
+  quindi i filtri applicati alla tabella di destra si propagano anche a sinistra.
+  È il caso di IW67->IH06, GPS->LO-TR e IK07_ATTIVO->IK07_full.
+
+  Relazioni automatiche data/ora da IGNORARE (66):
+  collegano ogni colonna data/ora alla LocalDateTable_* generata da Power BI.
+  Nessuna di queste ha rilevanza funzionale nella web app.
+
+================================================================================
+ 4. MISURE DAX
+================================================================================
+
+  Il modello contiene SOLO 2 misure esplicite, entrambe sulla tabella principale.
+  Tutti gli altri numeri dei visual sono MISURE IMPLICITE: aggregazioni automatiche
+  di colonna (Somma / Conteggio / Conteggio distinto). Non esistono quindi altre
+  formule DAX da replicare.
+
+  ### MISURA: MostraDati
+      Tabella      : ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full
+      FormatString : 0
+      DAX:
+          
+          IF (
+              ISFILTERED ('ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full'[PdM_definitivo_clone] ) || ISFILTERED ( 'ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full'[IW29_full.Avviso_clone] ),
+              1,
+              0
+          )
+
+  ### MISURA: PdM Non Visibile
+      Tabella      : ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full
+      FormatString : 0
+      DAX:
+          
+          COUNTROWS(
+              FILTER(
+                  'ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full',
+                  'ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full'[PdM non visibile in ZSTMAIA] = "PdM non visibile in ZSTMAIA"
+              )
+          ) + 0
+          
+
+  Note sulle due misure:
+    - "MostraDati" restituisce 1 o 0 e vale 1 solo quando il visual corrente è
+      filtrato su [PdM_definitivo_clone] oppure su [IW29_full.Avviso_clone].
+      Serve da guardia per non mostrare valori quando non c'è selezione.
+    - "PdM Non Visibile" conta le righe con [PdM non visibile in ZSTMAIA] =
+      "PdM non visibile in ZSTMAIA"; il "+ 0" serve a forzare il tipo numerico.
+      Evidenzia i difetti presenti in IW29 ma non in ZSTMAIA.
+
+================================================================================
+ 5. CODICE M (POWER QUERY) - COMPLETO
+================================================================================
+
+  Ogni query M coincide con la partizione della tabella omonima (modalità Import).
+  Il codice riportato è esattamente quello contenuto nel modello, quindi è la
+  fonte di verità. La cartella LEGACY/Codice M/ contiene gli stessi testi come
+  file separati.
+
+  Convenzioni dei nomi di step (interfaccia italiana di Power Query):
+    Origine / Source                  = caricamento del file
+    Intestazioni alzate di livello    = Table.PromoteHeaders
+    Modificato tipo                   = Table.TransformColumnTypes
+    Righe vuote rimosse               = Table.SelectRows (scarta righe vuote)
+    Rinominate colonne                = Table.RenameColumns
+    Suddividi colonna in base al ...  = Table.SplitColumn
+    Aggiunta colonna personalizzata   = Table.AddColumn
+    Raggruppate righe                 = Table.Group
+    Sostituito valore                 = Table.ReplaceValue
+
+--------------------------------------------------------------------------------
+ QUERY 1/24  ->  TABELLA [GPS]   (fonte: GPS.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\GPS.xlsx"), null, true),
+    Sheet1_Sheet = Origine{[Item="Sheet1",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Sede tecnica", type text}, {"Definizione della sede tecnica", type text}, {"Divis. ubic.", type text}, {"Stato sistema", type text}, {"Stato utente", type text}, {"Km. Inizio", type number}, {"Km. Fine", type number}, {"Data modifica", type any}, {"Autore modifica", type text}, {"Centro di lavoro", type text}, {"Località", type text}, {"In funz. dal", type any}, {"Data creazione", type any}, {"Divisione pian.", type text}, {"Lunghezza", Int64.Type}, {"Sede tecnica superiore", type text}, {"Sede tecnica di riferimento", type text}, {"Latitudine Fine", type number}, {"Latitudine Inizio", type number}, {"Longitudine Fine", type number}, {"Altitudine Fine", type number}, {"Altitudine Inizio", type number}, {"Longitudine Inizio", type number}})
+in
+    #"Modificato tipo"
+
+--------------------------------------------------------------------------------
+ QUERY 2/24  ->  TABELLA [IW67]   (fonte: IW67.XLSX)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\IW67.XLSX"), null, true),
+    Data_Sheet = Origine{[Item="Data",Kind="Sheet"]}[Data],
+    #"Modificato tipo2" = Table.TransformColumnTypes(Data_Sheet,{{"Column1", type text}, {"Column2", type text}, {"Column3", type text}, {"Column4", type text}, {"Column5", type text}, {"Column6", type text}, {"Column7", type text}, {"Column8", type text}, {"Column9", type text}, {"Column10", type text}, {"Column11", type text}, {"Column12", type text}, {"Column13", type text}, {"Column14", type text}, {"Column15", type text}, {"Column16", type text}, {"Column17", type text}, {"Column18", type text}, {"Column19", type text}, {"Column20", type text}, {"Column21", type text}, {"Column22", type text}, {"Column23", type text}, {"Column24", type any}}),
+    #"Rimosse prime righe" = Table.Skip(#"Modificato tipo2",4),
+    #"Righe vuote rimosse" = Table.SelectRows(#"Rimosse prime righe", each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(#"Righe vuote rimosse", [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Avviso", Int64.Type}, {"Ordine", Int64.Type}, {"Definizione della sede tecnica", type text}, {"Tp.", type text}, {"Codice", type text}, {"Testo per la misura", type text}, {"Testo codice per misura", type text}, {"Data", type date}, {"Descrizione", type text}, {"Latit iniz", Int64.Type}, {"Long inizi", Int64.Type}, {"CLavResp", type text}, {"CD", type text}, {"Data rif.", type date}, {"DataEsec.", type date}, {"In. pian.", type date}, {"Mod. il", type date}, {"Data cr.", type date}, {"Fine pian.", type date}, {"FineRich.", type date}, {"Sede tecnica", type text}, {"ST cons.", type text}, {"St.sist.", type text}}),
+    #"Sostituito valore" = Table.ReplaceValue(#"Modificato tipo"," ","",Replacer.ReplaceText,{"Testo per la misura"}),
+    #"Suddividi colonna in base al delimitatore" = Table.SplitColumn(#"Sostituito valore", "Testo per la misura", Splitter.SplitTextByDelimiter("Val.", QuoteStyle.Csv), {"Testo per la misura.1", "Testo per la misura.2"}),
+    #"Modificato tipo1" = Table.TransformColumnTypes(#"Suddividi colonna in base al delimitatore",{{"Testo per la misura.1", type text}, {"Testo per la misura.2", type number}}),
+    #"Rinominate colonne" = Table.RenameColumns(#"Modificato tipo1",{{"Testo per la misura.1", "Km."}, {"Testo per la misura.2", "Val."}}),
+    #"Duplicata colonna" = Table.DuplicateColumn(#"Rinominate colonne", "Sede tecnica", "Sede tecnica - Copia"),
+    #"Testo estratto prima del delimitatore" = Table.TransformColumns(#"Duplicata colonna", {{"Sede tecnica - Copia", each Text.BeforeDelimiter(_, "-"), type text}}),
+    #"Rinominate colonne1" = Table.RenameColumns(#"Testo estratto prima del delimitatore",{{"Sede tecnica - Copia", "SeTe primo livello"}}),
+    #"Aggiunta colonna personalizzata" = Table.AddColumn(#"Rinominate colonne1", "Personalizzato", each Date.Year([Data])),
+    #"Filtrate righe" = Table.SelectRows(#"Aggiunta colonna personalizzata", each [Personalizzato] > 2021),
+    #"Rinominate colonne2" = Table.RenameColumns(#"Filtrate righe",{{"Personalizzato", "Anno avviso"}}),
+    #"Caratteri iniziali estratti" = Table.TransformColumns(#"Rinominate colonne2", {{"Sede tecnica", each Text.Start(_, 14), type text}}),
+    #"Rinominate colonne3" = Table.RenameColumns(#"Caratteri iniziali estratti",{{"FineRich.", "Data Fine Richiesta"}, {"Testo codice per misura", "Testo"}}),
+    #"Aggiunta colonna personalizzata1" = Table.AddColumn(#"Rinominate colonne3", "Personalizzato", each Date.QuarterOfYear([Data])),
+    #"Aggiunta colonna personalizzata2" = Table.AddColumn(#"Aggiunta colonna personalizzata1", "Personalizzato.1", each if [#"St.sist."]="MISC" then "CHIUSO" else if
+[Data Fine Richiesta]<Date.From(DateTime.LocalNow()) then "SCADUTO" else if [Data Fine Richiesta]<Date.AddDays(Date.From(DateTime.LocalNow()), 10) then "SCAD.<10GG" else if [Data Fine Richiesta]<Date.AddDays(Date.From(DateTime.LocalNow()), 30) then "SCAD.<30GG" else if  [Data Fine Richiesta]<Date.AddDays(Date.From(DateTime.LocalNow()), 60) then "SCAD.<60GG" else "SCAD.>60GG"),
+    #"Rinominate colonne4" = Table.RenameColumns(#"Aggiunta colonna personalizzata2",{{"Personalizzato.1", "Stato"}, {"Tp.", "Tipo"}, {"St.sist.", "Stato sist."}}),
+    #"Testo inserito prima del delimitatore" = Table.AddColumn(#"Rinominate colonne4", "Testo prima del delimitatore", each Text.BeforeDelimiter([#"Km."], ","), type text),
+    #"Rinominate colonne5" = Table.RenameColumns(#"Testo inserito prima del delimitatore",{{"Testo prima del delimitatore", "Km. rif."}, {"Val.", "Val. difetto"}}),
+    #"Aggiunta colonna personalizzata3" = Table.AddColumn(#"Rinominate colonne5", "Km inizio", each Text.BeforeDelimiter([#"Km."], "-")),
+    #"Aggiunta colonna personalizzata4" = Table.AddColumn(#"Aggiunta colonna personalizzata3", "Km fine", each Text.AfterDelimiter([#"Km."], "-")),
+    #"Rinominate colonne6" = Table.RenameColumns(#"Aggiunta colonna personalizzata4",{{"Personalizzato", "Trimestre"}}),
+    #"Aggiunta colonna personalizzata5" = Table.AddColumn(#"Rinominate colonne6", "Cod. Stato", each if [#"Stato sist."]="MISC" then 2 else if
+[Data Fine Richiesta]<Date.From(DateTime.LocalNow()) then 1 else if [Data Fine Richiesta]<Date.AddDays(Date.From(DateTime.LocalNow()), 10) then 3 else if [Data Fine Richiesta]<Date.AddDays(Date.From(DateTime.LocalNow()), 30) then 4 else if  [Data Fine Richiesta]<Date.AddDays(Date.From(DateTime.LocalNow()), 60) then 5 else 6)
+in
+    #"Aggiunta colonna personalizzata5"
+
+--------------------------------------------------------------------------------
+ QUERY 3/24  ->  TABELLA [IH06]   (fonte: IH06.XLSX)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\IH06.XLSX"), null, true),
+    Sheet1_Sheet = Origine{[Item="Sheet1",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Sede tecnica", type text}, {"Definizione della sede tecnica", type text}, {"Divis. ubic.", type text}, {"Stato sistema", type text}, {"Stato utente", type text}, {"Km. Inizio", type number}, {"Km. Fine", type number}, {"Data modifica", type date}, {"Autore modifica", type text}, {"Centro di lavoro", type text}, {"Località", type text}, {"In funz. dal", type date}, {"Data creazione", type date}, {"Divisione pian.", type text}, {"Lunghezza", type text}, {"Sede tecnica di riferimento", type text}, {"Telefono", type text}, {"Centro lavoro resp.", type text}, {"Tipo di oggetto", type text}, {"Sistema d'identif.", type text}, {"Altezza minima L.d.C. [m]", type number}, {"Autore dell'ultima modifica", type text}, {"Base assoluta", type text}, {"Binario", type text}, {"Binario AV/AC", type text}, {"Binario Allegato VI.12", type text}, {"Binario elettrificato", type text}, {"Classe linea per vigilanza", Int64.Type}, {"Codice binario SAS", type text}, {"Data dell'ultima modifica", Int64.Type}, {"Div. pian. della manutenzione", type text}, {"Intercon. circol. da treni", type text}, {"Interconnessione", type text}, {"Linea di appartenenza", type text}, {"Lungh. di stazionamento [m]", Int64.Type}, {"Lunghezza del binario [Km]", type number}, {"Monitoraggio Carico Dinamico", type text}, {"Monitoraggio temp. rotaia", type text}, {"Presenza Raccordo in Tratta", type text}, {"Profilo Manutentivo L94 (BC)", type text}, {"Progr. Km monitoraggio temp.", type number}, {"Progr. Km. altezza min. L.d.C.", type number}, {"Sent. percorribile piedi", type text}, {"Tipo L.d.C.", type text}, {"Velocità Rango A", Int64.Type}, {"Velocità Rango B", Int64.Type}, {"Velocità Rango C", Int64.Type}, {"Velocità Rango P", Int64.Type}, {"n. Regolazioni Automatiche", Int64.Type}, {"n. dev. manovr. mano centr.", Int64.Type}, {"n. deviatoi elettrici", Int64.Type}, {"n. di sezioni marcia DX", Int64.Type}, {"n. di sezioni marcia SX", Int64.Type}, {"n. passatoie", Int64.Type}, {"n. tot deviatoi/inters. centr.", Int64.Type}}),
+    #"Rinominate colonne" = Table.RenameColumns(#"Modificato tipo",{{"Binario", "Bin."}})
+in
+    #"Rinominate colonne"
+
+--------------------------------------------------------------------------------
+ QUERY 4/24  ->  TABELLA [LO-TR]   (fonte: LO-TR.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\LO-TR.xlsx"), null, true),
+    #"LO-TR_Sheet" = Origine{[Item="LO-TR",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(#"LO-TR_Sheet", [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Sede tecnica", type text}, {"Definizione", type text}, {"Divis. ubic.", type text}, {"Stato utente", type text}, {"Stato sistema", type text}, {"Km. Inizio", type number}, {"CdC", Int64.Type}, {"Codice linea InRete", type text}, {"Linea InRete", type text}, {"Linea Profilo", type text}, {"LVU", type text}, {"ISU", type text}, {"TEU", type text}, {"Lavori Armamento", type text}, {"Impianti di Sicurezz", type text}, {"Trazione Elettrica", type text}, {"Linea  Primaria", type text}, {"Luce/Forza motrice", type text}, {"Sotto Stazione Elett", type text}, {"Spec. Sotto Stazione", type text}, {"Spec. Telecomandi SS", type text}, {"Spec. Diagnostica", type text}, {"Spec. Diag. Armament", type text}, {"Spec. Cant. Meccaniz", type text}, {"Spec. Ponti", type text}, {"Spec. IS Attivazioni", type text}, {"Spec. IS Telecomandi", type text}, {"Spec. IS Centraline/", type text}, {"Spec. Sup.Fis.Trasm.", type text}, {"Spec. Alta Frequenza", type text}, {"Spec. Trasmissione D", type text}, {"Spec. Central.Tel.Au", type text}, {"Spec. Radiotelefonia", type text}}),
+    #"Rinominate colonne" = Table.RenameColumns(#"Modificato tipo",{{"Definizione", "Località/Tratta"}}),
+    #"Sostituito valore" = Table.ReplaceValue(#"Rinominate colonne","","N.D.",Replacer.ReplaceValue,{"Divis. ubic."})
+in
+    #"Sostituito valore"
+
+--------------------------------------------------------------------------------
+ QUERY 5/24  ->  TABELLA [DATA_ORA]   (fonte: DATA_ORA.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\DATA_ORA.xlsx"), null, true),
+    Foglio1_Sheet = Origine{[Item="Foglio1",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(Foglio1_Sheet, [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Data e ora scarico dati:", type datetime}})
+in
+    #"Modificato tipo"
+
+--------------------------------------------------------------------------------
+ QUERY 6/24  ->  TABELLA [CAOR_ODL]   (fonte: CAOR_ODL.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\CAOR_ODL.xlsx"), null, true),
+    CAOR_ODL_Sheet = Origine{[Item="CAOR_ODL",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(CAOR_ODL_Sheet, [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Data", type date}, {"Creato il", type date}}),
+    #"Raggruppate righe" = Table.Group(#"Modificato tipo", {"Ord. dest."}, {{"Data prima consuntivazione", each List.Min([Data]), type nullable date}, {"Data ultima consuntivazione", each List.Max([Data]), type nullable date}, {"Ore consuntivate", each List.Sum([#"       Ore"]), type number}}),
+    #"Rinominate colonne" = Table.RenameColumns(#"Raggruppate righe",{{"Ore consuntivate", "Ore cons. su OdL"}, {"Data prima consuntivazione", "Data prima cons. su OdL"}, {"Data ultima consuntivazione", "Data ultima cons. su OdL"}})
+in
+    #"Rinominate colonne"
+
+--------------------------------------------------------------------------------
+ QUERY 7/24  ->  TABELLA [CAOR_NTW]   (fonte: CAOR_NTW.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\CAOR_NTW.xlsx"), null, true),
+    CAOR_NTW_Sheet = Origine{[Item="CAOR_NTW",Kind="Sheet"]}[Data],
+    #"Modificato tipo1" = Table.TransformColumnTypes(CAOR_NTW_Sheet,{{"Column11", type text}, {"Column10", type text}}),
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(#"Modificato tipo1", [PromoteAllScalars=true]),
+    #"Aggiunta colonna personalizzata" = Table.AddColumn(#"Intestazioni alzate di livello", "Networl-C. lav.", each if [Network] = "n.d." then "n.d." else [Network] & "-" & [#"C. lav."]),
+    #"Raggruppate righe" = Table.Group(#"Aggiunta colonna personalizzata", {"Networl-C. lav."}, {{"Data prima consuntivazione", each List.Min([Data]), type text}, {"Data ultima consuntivazione", each List.Max([Data]), type text}, {"Ore consuntivate", each List.Sum([#"        Ore"]), type number}}),
+    #"Rinominate colonne" = Table.RenameColumns(#"Raggruppate righe",{{"Ore consuntivate", "Ore cons. su Ntw"}, {"Data prima consuntivazione", "Data prima cons. su NTW"}, {"Data ultima consuntivazione", "Data ultima cons. su NTW"}})
+in
+    #"Rinominate colonne"
+
+--------------------------------------------------------------------------------
+ QUERY 8/24  ->  TABELLA [IW39_STATO_ODL]   (fonte: IW39_STATO_ODL.XLSX)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\IW39_STATO_ODL.XLSX"), null, true),
+    Sheet1_Sheet = Origine{[Item="Sheet1",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(Sheet1_Sheet, [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Centro lavoro resp.", type text}, {"Divisione", type text}, {"Ordine", Int64.Type}, {"Tipo di ordine", Int64.Type}, {"Data inizio cardine", type date}, {"Tsto br.", type text}, {"Stato sistema", type text}, {"Costi tot. effettivi", type number}, {"Costi totali pian.", type number}, {"Data fine cardine", type date}, {"Data inizio eff.", type date}, {"Fine schedulata", type date}, {"Inizio schedulato", type date}, {"Sede tecnica", type text}, {"Tot. pianificato", type number}, {"Totale (effettivo)", type number}}),
+    #"Aggiunta colonna personalizzata" = Table.AddColumn(#"Modificato tipo", "Stato OdL", each if Text.PositionOf([Stato sistema], "TECC")>-1 then "Chiuso" else if Text.PositionOf([Stato sistema], "RIL")>-1 then "Rilasciato" else if Text.PositionOf([Stato sistema], "APER")>-1 then "Aperto" else  if Text.PositionOf([Stato sistema], "CONC")>-1 then "Concluso" else "n.d.")
+in
+    #"Aggiunta colonna personalizzata"
+
+--------------------------------------------------------------------------------
+ QUERY 9/24  ->  TABELLA [IW29_full]   (fonte: IW29_full.txt)
+--------------------------------------------------------------------------------
+let
+    Origine = Table.FromColumns({Lines.FromBinary(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\IW29_full.txt"), null, null, 1252)}),
+    #"Modifica tipo" = Table.TransformColumnTypes(Origine,{{"Column1", type text}}),
+    #"Rimosse prime righe" = Table.Skip(#"Modifica tipo",3),
+    #"Righe vuote rimosse" = Table.SelectRows(#"Rimosse prime righe", each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    #"Suddividi colonna in base al delimitatore" = Table.SplitColumn(#"Righe vuote rimosse", "Column1", Splitter.SplitTextByDelimiter("#(tab)", QuoteStyle.Csv), {"Column1.1", "Column1.2", "Column1.3", "Column1.4", "Column1.5", "Column1.6", "Column1.7", "Column1.8", "Column1.9", "Column1.10", "Column1.11", "Column1.12", "Column1.13", "Column1.14", "Column1.15", "Column1.16", "Column1.17", "Column1.18", "Column1.19", "Column1.20", "Column1.21", "Column1.22"}),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Suddividi colonna in base al delimitatore",{{"Column1.1", type text}, {"Column1.2", type text}, {"Column1.3", type text}, {"Column1.4", type text}, {"Column1.5", type text}, {"Column1.6", type text}, {"Column1.7", type text}, {"Column1.8", type text}, {"Column1.9", type text}, {"Column1.10", type text}, {"Column1.11", type text}, {"Column1.12", type text}, {"Column1.13", type text}, {"Column1.14", type text}, {"Column1.15", type text}, {"Column1.16", type text}, {"Column1.17", type text}, {"Column1.18", type text}, {"Column1.19", type text}, {"Column1.20", type text}, {"Column1.21", type text}, {"Column1.22", type text}}),
+    #"Rimosse colonne" = Table.RemoveColumns(#"Modificato tipo",{"Column1.1"}),
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(#"Rimosse colonne", [PromoteAllScalars=true]),
+    #"Sostituito valore" = Table.ReplaceValue(#"Intestazioni alzate di livello",".","/",Replacer.ReplaceText,{"FineRich.", "In. rich.", "Chiusura", "Data", "Data cr.", "Data rif.", "Mod. il", "Dt.rif.cl."}),
+    #"Modificato tipo1" = Table.TransformColumnTypes(#"Sostituito valore",{{"FineRich.", type date}, {"In. rich.", type date}, {"Chiusura", type date}, {"Data", type date}, {"Data cr.", type date}, {"Mod. il", type date}, {"Data rif.", type date}, {"Dt.rif.cl.", type date}}),
+    #"Rinominate colonne" = Table.RenameColumns(#"Modificato tipo1",{{"Chiusura", "Data chiusura"}, {"Data", "Data avviso"}, {"Mod. il", "Data modifica"}})
+in
+    #"Rinominate colonne"
+
+--------------------------------------------------------------------------------
+ QUERY 10/24  ->  TABELLA [ZSTMAIA1_full]   (fonte: ZSTMAIA1_full.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\ZSTMAIA1_full.xlsx"), null, true),
+    Data_Sheet = Origine{[Item="Data",Kind="Sheet"]}[Data],
+    #"Rimosse prime righe" = Table.Skip(Data_Sheet,59),
+    #"Ultime righe rimosse" = Table.RemoveLastN(#"Rimosse prime righe",20),
+    #"Filtrate righe" = Table.SelectRows(#"Ultime righe rimosse", each [Column1] <> "COD." and [Column1] <> "TRATTA" and [Column1] <> ""),
+    #"Rinominate colonne" = Table.RenameColumns(#"Filtrate righe",{{"Column1", "Tratta"}, {"Column3", "Dev."}, {"Column5", "Bin."}, {"Column7", "Fila"}, {"Column9", "Km linea"}, {"Column13", "Pdm"}}),
+    #"Rimosse colonne" = Table.RemoveColumns(#"Rinominate colonne",{"Column2", "Column4", "Column6", "Column8", "Column10", "Column11", "Column12", "Column14"}),
+    #"Rinominate colonne1" = Table.RenameColumns(#"Rimosse colonne",{{"Column15", "Tipo difetto"}}),
+    #"Rimosse colonne1" = Table.RemoveColumns(#"Rinominate colonne1",{"Column16"}),
+    #"Rinominate colonne2" = Table.RenameColumns(#"Rimosse colonne1",{{"Column18", "Classe provvedimento"}}),
+    #"Rimosse colonne2" = Table.RemoveColumns(#"Rinominate colonne2",{"Column19", "Column20"}),
+    #"Rinominate colonne3" = Table.RenameColumns(#"Rimosse colonne2",{{"Column21", "Val. (%/mm)"}}),
+    #"Rimosse colonne3" = Table.RemoveColumns(#"Rinominate colonne3",{"Column22"}),
+    #"Rinominate colonne4" = Table.RenameColumns(#"Rimosse colonne3",{{"Column23", "Prof. Dif."}, {"Column24", "Pos. Dif"}, {"Column25", "Data Scoperta"}}),
+    #"Rinominate colonne5" = Table.RenameColumns(#"Rinominate colonne4",{{"Column26", "Tolto d'opera"}, {"Column27", "Data tolto d'opera"}, {"Column28", "Tipo Arm."}, {"Column29", "Osservazioni"}, {"Column30", "Data Agg."}}),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Rinominate colonne5",{{"Data tolto d'opera", type date}}),
+    #"Modificato tipo2" = Table.TransformColumnTypes(#"Modificato tipo",{{"Data Agg.", type date}}),
+    #"Rimosse colonne4" = Table.RemoveColumns(#"Modificato tipo2",{"Column31"}),
+    #"Filtrate righe1" = Table.SelectRows(#"Rimosse colonne4", each true),
+    #"Rimosse colonne5" = Table.RemoveColumns(#"Filtrate righe1",{"Column17"})
+in
+    #"Rimosse colonne5"
+
+--------------------------------------------------------------------------------
+ QUERY 11/24  ->  TABELLA [ZSTMAIA2_full]   (fonte: ZSTMAIA2_full.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\ZSTMAIA2_full.xlsx"), null, true),
+    Data_Sheet = Origine{[Item="Data",Kind="Sheet"]}[Data],
+    #"Rimosse prime righe" = Table.Skip(Data_Sheet,21),
+    #"Rimosse colonne" = Table.RemoveColumns(#"Rimosse prime righe",{"Column2", "Column5", "Column7", "Column9", "Column12", "Column13", "Column14", "Column15", "Column18", "Column20", "Column24", "Column34"}),
+    #"Ultime righe rimosse" = Table.RemoveLastN(#"Rimosse colonne",32),
+    #"Righe vuote rimosse" = Table.SelectRows(#"Ultime righe rimosse", each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    #"Filtrate righe" = Table.SelectRows(#"Righe vuote rimosse", each not Text.Contains([Column11], "N.PUNTO DI") and not Text.Contains([Column11], "MISURA")),
+    #"Rinominate colonne" = Table.RenameColumns(#"Filtrate righe",{{"Column1", "Data scoperta"}, {"Column3", "Cod. linea"}, {"Column4", "Cod. tratta"}, {"Column6", "Dev."}, {"Column8", "Bin"}, {"Column10", "km linea"}, {"Column11", "Pdm"}, {"Column16", "Ubi lin."}, {"Column17", "T. tratta ragg. fug."}, {"Column19", "Fila"}, {"Column21", "Tipo difetto"}, {"Column22", "Classe prov."}, {"Column23", "Valore (%/mm)"}, {"Column25", "Posizione difetto"}, {"Column26", "Tipo Sald."}, {"Column27", "Data esec. saldatura"}, {"Column28", "Posizione sezione"}, {"Column29", "Sald. in gar."}, {"Column30", "Tolto d'opera"}, {"Column31", "Data tolto d'opera"}, {"Column32", "Eseguito da"}, {"Column33", "ID saldatore"}}),
+    #"Sostituito valore" = Table.ReplaceValue(#"Rinominate colonne","00/00/0000",null,Replacer.ReplaceValue,{"Data scoperta"}),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Sostituito valore",{{"Data scoperta", type date}, {"Data tolto d'opera", type date}})
+in
+    #"Modificato tipo"
+
+--------------------------------------------------------------------------------
+ QUERY 12/24  ->  TABELLA [ZSTMAIA7_full_VEM1]   (fonte: ZSTMAIA7_full_VEM1.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\ZSTMAIA7_full_VEM1.xlsx"), null, true),
+    Data_Sheet = Origine{[Item="Data",Kind="Sheet"]}[Data],
+    #"Modificato tipo" = Table.TransformColumnTypes(Data_Sheet,{{"Column1", type text}, {"Column2", type text}, {"Column3", type text}, {"Column4", type text}, {"Column5", type text}, {"Column6", type text}, {"Column7", type text}, {"Column8", type any}, {"Column9", type any}, {"Column10", type text}, {"Column11", type text}, {"Column12", type text}, {"Column13", type text}, {"Column14", type text}, {"Column15", Int64.Type}, {"Column16", type text}, {"Column17", type text}, {"Column18", type date}, {"Column19", type text}, {"Column20", type text}, {"Column21", type text}, {"Column22", type text}, {"Column23", type any}}),
+    #"Rimosse prime righe" = Table.Skip(#"Modificato tipo",15),
+    #"Ultime righe rimosse" = Table.RemoveLastN(#"Rimosse prime righe",18),
+    #"Rimosse colonne" = Table.RemoveColumns(#"Ultime righe rimosse",{"Column2", "Column5", "Column6", "Column8", "Column9", "Column12", "Column13", "Column15", "Column23"}),
+    #"Righe vuote rimosse" = Table.SelectRows(#"Rimosse colonne", each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    #"Filtrate righe" = Table.SelectRows(#"Righe vuote rimosse", each not Text.Contains([Column20], "N.PUNTO DI") and not Text.Contains([Column20], "MISURA")),
+    #"Rinominate colonne" = Table.RenameColumns(#"Filtrate righe",{{"Column1", "Data scoperta"}, {"Column3", "Cod. linea"}, {"Column4", "Cod. SeTe"}, {"Column7", "Bin."}, {"Column10", "Fila"}, {"Column11", "km linea"}, {"Column14", "Tipo difetto"}, {"Column16", "Classe porvv."}, {"Column17", "Tolto d'opera"}, {"Column18", "Data tolto d'opera"}, {"Column19", "Centro di lavoro"}, {"Column20", "Pdm"}, {"Column21", "N. doc. di misura"}, {"Column22", "Avviso"}}),
+    #"Modificato tipo1" = Table.TransformColumnTypes(#"Rinominate colonne",{{"Data scoperta", type date}, {"Data tolto d'opera", type date}})
+in
+    #"Modificato tipo1"
+
+--------------------------------------------------------------------------------
+ QUERY 13/24  ->  TABELLA [ZSTMAIA7_full_VEM2]   (fonte: ZSTMAIA7_full_VEM2.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\ZSTMAIA7_full_VEM2.xlsx"), null, true),
+    Data_Sheet = Origine{[Item="Data",Kind="Sheet"]}[Data],
+    #"Modificato tipo" = Table.TransformColumnTypes(Data_Sheet,{{"Column1", type text}, {"Column2", type text}, {"Column3", type text}, {"Column4", type text}, {"Column5", type text}, {"Column6", type text}, {"Column7", type text}, {"Column8", type any}, {"Column9", type any}, {"Column10", type text}, {"Column11", type text}, {"Column12", type text}, {"Column13", type text}, {"Column14", type text}, {"Column15", Int64.Type}, {"Column16", type text}, {"Column17", type text}, {"Column18", type date}, {"Column19", type text}, {"Column20", type text}, {"Column21", type text}, {"Column22", type text}, {"Column23", type any}}),
+    #"Rimosse prime righe" = Table.Skip(#"Modificato tipo",15),
+    #"Ultime righe rimosse" = Table.RemoveLastN(#"Rimosse prime righe",18),
+    #"Rimosse colonne" = Table.RemoveColumns(#"Ultime righe rimosse",{"Column2", "Column5", "Column6", "Column8", "Column9", "Column12", "Column13", "Column15", "Column23"}),
+    #"Righe vuote rimosse" = Table.SelectRows(#"Rimosse colonne", each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    #"Filtrate righe" = Table.SelectRows(#"Righe vuote rimosse", each not Text.Contains([Column20], "N.PUNTO DI") and not Text.Contains([Column20], "MISURA")),
+    #"Rinominate colonne" = Table.RenameColumns(#"Filtrate righe",{{"Column1", "Data scoperta"}, {"Column3", "Cod. linea"}, {"Column4", "Cod. SeTe"}, {"Column7", "Bin."}, {"Column10", "Fila"}, {"Column11", "km linea"}, {"Column14", "Tipo difetto"}, {"Column16", "Classe porvv."}, {"Column17", "Tolto d'opera"}, {"Column18", "Data tolto d'opera"}, {"Column19", "Centro di lavoro"}, {"Column20", "Pdm"}, {"Column21", "N. doc. di misura"}, {"Column22", "Avviso"}}),
+    #"Modificato tipo1" = Table.TransformColumnTypes(#"Rinominate colonne",{{"Data scoperta", type date}, {"Data tolto d'opera", type date}})
+in
+    #"Modificato tipo1"
+
+--------------------------------------------------------------------------------
+ QUERY 14/24  ->  TABELLA [ZSTMAIA7_full_VEM1+VEM2]   (fonte: derivata)
+--------------------------------------------------------------------------------
+let
+    Origine = Table.Combine({ZSTMAIA7_full_VEM1, ZSTMAIA7_full_VEM2})
+in
+    Origine
+
+--------------------------------------------------------------------------------
+ QUERY 15/24  ->  TABELLA [ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full]   (fonte: derivata)
+--------------------------------------------------------------------------------
+let
+    Origine = Table.NestedJoin(ZSTMAIA1_full, {"Pdm"}, ZSTMAIA2_full, {"Pdm"}, "ZSTMAIA2_full", JoinKind.FullOuter),
+    #"Tabella ZSTMAIA2_full espansa" = Table.ExpandTableColumn(Origine, "ZSTMAIA2_full", {"Data scoperta", "Cod. linea", "Cod. tratta", "Dev.", "Bin", "km linea", "Pdm", "Ubi lin.", "T. tratta ragg. fug.", "Fila", "Tipo difetto", "Classe prov.", "Valore (%/mm)", "Posizione difetto", "Tipo Sald.", "Data esec. saldatura", "Posizione sezione", "Sald. in gar.", "Tolto d'opera", "Data tolto d'opera", "Eseguito da", "ID saldatore"}, {"ZSTMAIA2_full.Data scoperta", "ZSTMAIA2_full.Cod. linea", "ZSTMAIA2_full.Cod. tratta", "ZSTMAIA2_full.Dev.", "ZSTMAIA2_full.Bin", "ZSTMAIA2_full.km linea", "ZSTMAIA2_full.Pdm", "ZSTMAIA2_full.Ubi lin.", "ZSTMAIA2_full.T. tratta ragg. fug.", "ZSTMAIA2_full.Fila", "ZSTMAIA2_full.Tipo difetto", "ZSTMAIA2_full.Classe prov.", "ZSTMAIA2_full.Valore (%/mm)", "ZSTMAIA2_full.Posizione difetto", "ZSTMAIA2_full.Tipo Sald.", "ZSTMAIA2_full.Data esec. saldatura", "ZSTMAIA2_full.Posizione sezione", "ZSTMAIA2_full.Sald. in gar.", "ZSTMAIA2_full.Tolto d'opera", "ZSTMAIA2_full.Data tolto d'opera", "ZSTMAIA2_full.Eseguito da", "ZSTMAIA2_full.ID saldatore"}),
+    #"Merge ZSTMAIA7_full_VEM1+VEM2" = Table.NestedJoin(#"Tabella ZSTMAIA2_full espansa", {"Pdm"}, #"ZSTMAIA7_full_VEM1+VEM2", {"Pdm"}, "ZSTMAIA7_full_VEM1+VEM2", JoinKind.FullOuter),
+    #"Tabella ZSTMAIA7_full_VEM1+VEM2 espansa" = Table.ExpandTableColumn(#"Merge ZSTMAIA7_full_VEM1+VEM2", "ZSTMAIA7_full_VEM1+VEM2", {"Data scoperta", "Cod. linea", "Cod. SeTe", "Bin.", "Fila", "km linea", "Tipo difetto", "Classe porvv.", "Tolto d'opera", "Data tolto d'opera", "Centro di lavoro", "Pdm", "N. doc. di misura", "Avviso"}, {"ZSTMAIA7_full_VEM1+VEM2.Data scoperta", "ZSTMAIA7_full_VEM1+VEM2.Cod. linea", "ZSTMAIA7_full_VEM1+VEM2.Cod. SeTe", "ZSTMAIA7_full_VEM1+VEM2.Bin.", "ZSTMAIA7_full_VEM1+VEM2.Fila", "ZSTMAIA7_full_VEM1+VEM2.km linea", "ZSTMAIA7_full_VEM1+VEM2.Tipo difetto", "ZSTMAIA7_full_VEM1+VEM2.Classe porvv.", "ZSTMAIA7_full_VEM1+VEM2.Tolto d'opera", "ZSTMAIA7_full_VEM1+VEM2.Data tolto d'opera", "ZSTMAIA7_full_VEM1+VEM2.Centro di lavoro", "ZSTMAIA7_full_VEM1+VEM2.Pdm", "ZSTMAIA7_full_VEM1+VEM2.N. doc. di misura", "ZSTMAIA7_full_VEM1+VEM2.Avviso"}),
+    #"Merge IW29_full" = Table.NestedJoin(#"Tabella ZSTMAIA7_full_VEM1+VEM2 espansa", {"ZSTMAIA7_full_VEM1+VEM2.Avviso"}, IW29_full, {"Avviso"}, "IW29_full", JoinKind.FullOuter),
+    #"Tabella IW29_full espansa" = Table.ExpandTableColumn(#"Merge IW29_full", "IW29_full", {"Tp.", "Avviso", "Descrizione", "Ordine", "Sede tecnica", "FineRich.", "In. rich.", "St.pag.", "St.sist.", "St.utente", "Autore", "Da", "Aut.avviso", "Data chiusura", "Data avviso", "Data cr.", "Data rif.", "Data modifica", "Dt.rif.cl.", "Network", "Op."}, {"IW29_full.Tp.", "IW29_full.Avviso", "IW29_full.Descrizione", "IW29_full.Ordine", "IW29_full.Sede tecnica", "IW29_full.FineRich.", "IW29_full.In. rich.", "IW29_full.St.pag.", "IW29_full.St.sist.", "IW29_full.St.utente", "IW29_full.Autore", "IW29_full.Da", "IW29_full.Aut.avviso", "IW29_full.Data chiusura", "IW29_full.Data avviso", "IW29_full.Data cr.", "IW29_full.Data rif.", "IW29_full.Data modifica", "IW29_full.Dt.rif.cl.", "IW29_full.Network", "IW29_full.Op."}),
+    #"Filtrate righe" = Table.SelectRows(#"Tabella IW29_full espansa", each true),
+    #"Merge ZAVVISI_TXT" = Table.NestedJoin(#"Filtrate righe", {"IW29_full.Avviso"}, ZAVVISI_TXT, {"Numero avviso"}, "ZAVVISI_TXT", JoinKind.LeftOuter),
+    #"Tabella ZAVVISI_TXT espansa" = Table.ExpandTableColumn(#"Merge ZAVVISI_TXT", "ZAVVISI_TXT", {"Testo Esteso"}, {"ZAVVISI_TXT.Testo Esteso"}),
+    #"Modificato tipo Data Scoperta" = Table.TransformColumnTypes(#"Tabella ZAVVISI_TXT espansa",{{"Data Scoperta", type date}}),
+    #"Aggiunta Avv. chiuso in ritardo" = Table.AddColumn(#"Modificato tipo Data Scoperta", "Avv. chiuso in ritardo", each if ([IW29_full.Data chiusura]<>null and [#"IW29_full.FineRich."]<>null) then
+   if [IW29_full.Data chiusura]>[#"IW29_full.FineRich."] then "Data chiusura avv. > Data fine rich." else ""
+else ""),
+    #"Aggiunta Data chiusura avv. < Data inizio avv." = Table.AddColumn(#"Aggiunta Avv. chiuso in ritardo", "Data chiusura avv. < Data inizio avv.", each if ([IW29_full.Data chiusura]<>null and [#"IW29_full.In. rich."]<>null) then
+    if [IW29_full.Data chiusura]<[#"IW29_full.In. rich."]      then "Data chiusura avv. < Data inizio avv." else ""
+else ""),
+    #"Aggiunta Data chiusura avv. futura" = Table.AddColumn(#"Aggiunta Data chiusura avv. < Data inizio avv.", "Data chiusura avv. futura", each if [IW29_full.Data chiusura] <> null and [IW29_full.Data chiusura] > Date.From(DateTime.LocalNow()) then "Data Tolto d'opera futura" else ""),
+    #"Aggiunta Ritardo Avv." = Table.AddColumn(#"Aggiunta Data chiusura avv. futura", "Ritardo Avv.", each if ([IW29_full.Data chiusura]<>null and [#"IW29_full.FineRich."]<>null) then
+   if [IW29_full.Data chiusura]>[#"IW29_full.FineRich."] then "(Ritardo " & Text.From(Duration.Days([IW29_full.Data chiusura]-[#"IW29_full.FineRich."])) & " gg)" else 0
+else 0),
+    #"Merge IK07_full" = Table.NestedJoin(#"Aggiunta Ritardo Avv.", {"Pdm"}, IK07_full, {"Punto di misura"}, "IK07_full", JoinKind.FullOuter),
+    #"Tabella IK07_full espansa" = Table.ExpandTableColumn(#"Merge IK07_full", "IK07_full", {"Autore modifica", "Punto di misura", "Descrizione", "Sede tecnica", "Tipo punto di mis.", "Gruppo codici", "Pos. misura", "Punto mis. inattivo", "Tipo catalogo", "Chiave lingua", "Creato da", "Data creazione", "Data modifica", "Mandante", "N. ogg. punto mis.", "Ind.punto mis. rif.", "Indic. di canc.", "Punto mis. è contat.", "Punto mis. rif.", "Tsto"}, {"IK07_full.Autore modifica", "IK07_full.Punto di misura", "IK07_full.Descrizione", "IK07_full.Sede tecnica", "IK07_full.Tipo punto di mis.", "IK07_full.Gruppo codici", "IK07_full.Pos. misura", "IK07_full.Punto mis. inattivo", "IK07_full.Tipo catalogo", "IK07_full.Chiave lingua", "IK07_full.Creato da", "IK07_full.Data creazione", "IK07_full.Data modifica", "IK07_full.Mandante", "IK07_full.N. ogg. punto mis.", "IK07_full.Ind.punto mis. rif.", "IK07_full.Indic. di canc.", "IK07_full.Punto mis. è contat.", "IK07_full.Punto mis. rif.", "IK07_full.Tsto"}),
+    #"Aggiunta PdM visibile in ZSTMAIA" = Table.AddColumn(#"Tabella IK07_full espansa", "PdM non visibile in ZSTMAIA", each if ([IK07_full.Punto di misura] <> null and [Pdm]=null) then
+    "PdM non visibile in ZSTMAIA"
+else ""),
+    #"Aggiunta PdM_definitivo" = Table.AddColumn(#"Aggiunta PdM visibile in ZSTMAIA", "PdM_definitivo", each if [Pdm] <> null then [Pdm] else [IK07_full.Punto di misura]),
+    #"Duplicata PdM_definitivo_clone" = Table.DuplicateColumn(#"Aggiunta PdM_definitivo", "PdM_definitivo", "PdM_definitivo_clone"),
+    #"Aggiunta Osservazioni_definitivo" = Table.AddColumn(#"Duplicata PdM_definitivo_clone", "Osservazioni_definitivo", each if ([IK07_full.Punto di misura] <> null and [Pdm]=null) then
+    [IK07_full.Descrizione]
+else
+    [Osservazioni]),
+    #"Aggiunta Sede_tecnica_definitiva" = Table.AddColumn(#"Aggiunta Osservazioni_definitivo", "Sede_tecnica_definitiva", each if [Tratta] <> null then [Tratta] else
+if [IW29_full.Sede tecnica]<>null then [IW29_full.Sede tecnica] else [IK07_full.Sede tecnica]),
+    #"Aggiunta  Tolto d'opera_definitivo" = Table.AddColumn(#"Aggiunta Sede_tecnica_definitiva", " Tolto d'opera_definitivo", each if ([IK07_full.Punto di misura] <> null and [Pdm]=null) then
+    if [IK07_full.Punto mis. inattivo]="X" then "S" else "N"
+else
+    [#"Tolto d'opera"]),
+    #"Aggiunta Anno" = Table.AddColumn(#"Aggiunta  Tolto d'opera_definitivo", "Anno", each if ([Pdm]<>null and [Data Scoperta]<>null) then
+    Date.Year([Data Scoperta])
+else if [IW29_full.Avviso]<>null then
+    Date.Year([IW29_full.Data avviso])
+else
+    Date.Year([IK07_full.Data creazione])),
+    #"Modificato tipo Anno" = Table.TransformColumnTypes(#"Aggiunta Anno",{{"Anno", Int64.Type}}),
+    #"Aggiunta tratta_definitiva" = Table.AddColumn(#"Modificato tipo Anno", "Caratteri iniziali", each Text.Start([Sede_tecnica_definitiva], 6), type text),
+    #"Rinominate colonne" = Table.RenameColumns(#"Aggiunta tratta_definitiva",{{"Caratteri iniziali", "Tratta_definitiva"}}),
+    #"Aggiunta PdM chiuso in ritardo" = Table.AddColumn(#"Rinominate colonne", "PdM chiuso in ritardo", each if ([#"Data tolto d'opera"]<>null and [#"IW29_full.FineRich."]<>null) then
+    if ([#"IW29_full.FineRich."] <>null and [#"Data tolto d'opera"]>[#"IW29_full.FineRich."]) then "Data Tolto d'opera > Data fine rich." else "" else ""),
+    #"Aggiunta Data Tolto d'opera < Data scoperta" = Table.AddColumn(#"Aggiunta PdM chiuso in ritardo", "Data Tolto d'opera < Data scoperta", each if ([Data Scoperta] <> null and [#"Data tolto d'opera"] <> null) then
+if [Data Scoperta]>[#"Data tolto d'opera"] then "Data Tolto d'opera < Data scoperta" else ""
+else ""),
+    #"Aggiunta Data Tolto d'opera futura" = Table.AddColumn(#"Aggiunta Data Tolto d'opera < Data scoperta", "Data Tolto d'opera futura", each if [#"Data tolto d'opera"] <> null and [#"Data tolto d'opera"] > Date.From(DateTime.LocalNow()) then "Data Tolto d'opera futura" else ""),
+    #"Aggiunta Ritardo PdM" = Table.AddColumn(#"Aggiunta Data Tolto d'opera futura", "Ritardo PdM", each if ([#"Data tolto d'opera"]<>null and [#"IW29_full.FineRich."]<>null) then
+    if ([#"IW29_full.FineRich."] <>null and [#"Data tolto d'opera"]>[#"IW29_full.FineRich."]) then "(Ritardo " & Text.From(Duration.Days([#"Data tolto d'opera"]-[#"IW29_full.FineRich."])) & " gg)" else 0
+else 0),
+    #"Aggiunta anomalie PdM" = Table.AddColumn(#"Aggiunta Ritardo PdM", "Anomalie PdM", each if [PdM non visibile in ZSTMAIA] <> "" then 1 else if [PdM chiuso in ritardo] <> "" then 1 else if [#"Data Tolto d'opera futura"] <> "" then 1 else if [#"Data Tolto d'opera < Data scoperta"] <> "" then 1 else 0),
+    #"Aggiunta avviso chiuso" = Table.AddColumn(#"Aggiunta anomalie PdM", "Avviso chiuso", each if [#"IW29_full.St.sist."] = null then null else if Text.Contains([#"IW29_full.St.sist."], "MECO") then "S" else "N"),
+    #"Aggiunta Classe prov definitiva" = Table.AddColumn(#"Aggiunta avviso chiuso", "Classe_prov_definitiva", each if ([Classe provvedimento]=null or [Classe provvedimento]="") then "MANCANTE" else [Classe provvedimento]),
+    #"Aggiunta avviso aperto" = Table.AddColumn(#"Aggiunta Classe prov definitiva", "Avviso aperto", each if [#"IW29_full.St.sist."] is null then 0 else if Text.Contains([#"IW29_full.St.sist."], "MECO") then 0 else 1),
+    #"Aggiunta PdM aperto" = Table.AddColumn(#"Aggiunta avviso aperto", "Pdm aperto", each if [#" Tolto d'opera_definitivo"] = "N" then 1 else 0),
+    #"Modificato tipo Pdm aperto avviso aperto" = Table.TransformColumnTypes(#"Aggiunta PdM aperto",{{"Avviso aperto", Int64.Type}, {"Pdm aperto", Int64.Type}}),
+    #"Aggiunta Avviso aperto o Pdm aperto" = Table.AddColumn(#"Modificato tipo Pdm aperto avviso aperto", "Avviso aperto o Pdm aperto", each if ([Avviso aperto]+[Pdm aperto])>0 then 1 else 0),
+    #"Modificato Avviso aperto o Pdm aperto" = Table.TransformColumnTypes(#"Aggiunta Avviso aperto o Pdm aperto",{{"Avviso aperto o Pdm aperto", Int64.Type}}),
+    #"Aggiunta Classificazione stato" = Table.AddColumn(#"Modificato Avviso aperto o Pdm aperto", "Classificazione stato", each (if [Pdm aperto] = 1 then
+    "Pdm aperto"
+else if [Pdm] is null then
+    "Pdm mancante"
+else
+    "Pdm chiuso")
+& " - " &
+(if [Avviso aperto] = 1 then
+     "Avv. aperto"
+else if [#"IW29_full.Avviso"] is null then
+     "Avv. mancante"
+else
+     "Avv. chiuso")),
+    #"Aggiunta Statos scadenza" = Table.AddColumn(#"Aggiunta Classificazione stato", "Stato scadenza", each if [Avviso aperto o Pdm aperto]=0 then
+   "COMPLETATO" else
+if [IW29_full.Avviso] is null then
+   "MANCANTE"
+else if [#"IW29_full.FineRich."]<Date.From(DateTime.LocalNow()) then
+   "SCADUTO"
+else if [#"IW29_full.FineRich."]<Date.AddDays(Date.From(DateTime.LocalNow()), 10) then
+   "SCAD.<10GG"
+else if [#"IW29_full.FineRich."]<Date.AddDays(Date.From(DateTime.LocalNow()), 30) then
+   "SCAD.<30GG" else if  [#"IW29_full.FineRich."]<Date.AddDays(Date.From(DateTime.LocalNow()), 60) then
+   "SCAD.<60GG"
+else
+   "SCAD.>60GG"),
+    #"Aggiunta Cod. stato scadenza" = Table.AddColumn(#"Aggiunta Statos scadenza", "Cod. stato scadenza", each if [Avviso aperto o Pdm aperto]=0 then
+   "00" else
+if [IW29_full.Avviso] is null then
+   "01"
+else if [#"IW29_full.FineRich."]<Date.From(DateTime.LocalNow()) then
+   "02"
+else if [#"IW29_full.FineRich."]<Date.AddDays(Date.From(DateTime.LocalNow()), 10) then
+   "03"
+else if [#"IW29_full.FineRich."]<Date.AddDays(Date.From(DateTime.LocalNow()), 30) then
+   "04" else if  [#"IW29_full.FineRich."]<Date.AddDays(Date.From(DateTime.LocalNow()), 60) then
+   "05"
+else
+   "06"),
+    #"Aggiunta Network/OdL agganciato" = Table.AddColumn(#"Aggiunta Cod. stato scadenza", "Network/OdL agganciato", each if [IW29_full.Avviso]<>null then
+   if [Avviso chiuso]="S" then
+      if([IW29_full.Network]<>null or ([IW29_full.Ordine]<>"" and [IW29_full.Ordine]<>"")) then "S" else "N"
+      else "-"
+else "-"),
+    #"Aggiunta chiave (Pdm o avviso)" = Table.AddColumn(#"Aggiunta Network/OdL agganciato", "Chiave (PdM o Avviso)", each if [PdM_definitivo]<>null then [PdM_definitivo] else [IW29_full.Avviso]),
+    #"Aggiunta presenza pdm e avviso" = Table.AddColumn(#"Aggiunta chiave (Pdm o avviso)", "Presenza PdM e Avviso", each if [PdM_definitivo]<>null then
+   if [IW29_full.Avviso]<>null then "Pdm con Avviso"
+   else "Pdm senza avviso"
+else
+   if [IW29_full.Avviso]<>null then "Avviso senza Pdm"
+   else "No avviso no Pdm"),
+    #"Aggiungi avviso clone" = Table.DuplicateColumn(#"Aggiunta presenza pdm e avviso", "IW29_full.Avviso", "IW29_full.Avviso - Copia"),
+    #"Rinominate colonne1" = Table.RenameColumns(#"Aggiungi avviso clone",{{"IW29_full.Avviso - Copia", "IW29_full.Avviso_clone"}})
+in
+    #"Rinominate colonne1"
+
+--------------------------------------------------------------------------------
+ QUERY 16/24  ->  TABELLA [ZAVVISI_TXT]   (fonte: ZAVVISI_TXT.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\ZAVVISI_TXT.xlsx"), null, true),
+    Data_Sheet = Origine{[Item="Data",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(Data_Sheet, [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Numero avviso", Int64.Type}, {"Testo Esteso", type text}}),
+    #"Modificato tipo1" = Table.TransformColumnTypes(#"Modificato tipo",{{"Numero avviso", type text}})
+in
+    #"Modificato tipo1"
+
+--------------------------------------------------------------------------------
+ QUERY 17/24  ->  TABELLA [IK07_ATTIVO]   (fonte: IK07_attivo.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\IK07_attivo.xlsx"), null, true),
+    Data_Sheet = Origine{[Item="Data",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(Data_Sheet, [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Autore modifica", Int64.Type}, {"Punto di misura", type any}, {"Descrizione", type text}, {"Sede tecnica", type text}, {"Tipo punto di mis.", type text}, {"Gruppo codici", type text}, {"Pos. misura", type text}, {"Punto mis. inattivo", type text}, {"Tipo catalogo", Int64.Type}, {"Chiave lingua", type text}, {"Creato da", Int64.Type}, {"Data creazione", type date}, {"Data modifica", type date}, {"Mandante", Int64.Type}, {"N. ogg. punto mis.", type text}, {"Ind.punto mis. rif.", type text}, {"Indic. di canc.", type text}, {"Punto mis. è contat.", type text}, {"Punto mis. rif.", type text}, {"Tsto", type text}})
+in
+    #"Modificato tipo"
+
+--------------------------------------------------------------------------------
+ QUERY 18/24  ->  TABELLA [IK07_INATTIVO]   (fonte: IK07_inattivo.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\IK07_inattivo.xlsx"), null, true),
+    Data_Sheet = Origine{[Item="Data",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(Data_Sheet, [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Autore modifica", type text}, {"Punto di misura", type any}, {"Descrizione", type text}, {"Sede tecnica", type text}, {"Tipo punto di mis.", type text}, {"Gruppo codici", type text}, {"Pos. misura", type text}, {"Punto mis. inattivo", type text}, {"Tipo catalogo", Int64.Type}, {"Chiave lingua", type text}, {"Creato da", Int64.Type}, {"Data creazione", type date}, {"Data modifica", type date}, {"Mandante", Int64.Type}, {"N. ogg. punto mis.", type text}, {"Ind.punto mis. rif.", type text}, {"Indic. di canc.", type text}, {"Punto mis. è contat.", type text}, {"Punto mis. rif.", type text}, {"Tsto", type text}})
+in
+    #"Modificato tipo"
+
+--------------------------------------------------------------------------------
+ QUERY 19/24  ->  TABELLA [IK07_full]   (fonte: derivata)
+--------------------------------------------------------------------------------
+let
+    Origine = Table.Combine({IK07_INATTIVO, IK07_ATTIVO})
+in
+    Origine
+
+--------------------------------------------------------------------------------
+ QUERY 20/24  ->  TABELLA [ABBACO Bologna-Padova]   (fonte: ABBA.CO.AGGIORNATO-RPC +++USARE QUESTO+++.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\ABBA.CO.AGGIORNATO-RPC +++USARE QUESTO+++.xlsx"), null, true),
+    #"Bologna-Padova_Sheet" = Origine{[Item="Bologna-Padova",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(#"Bologna-Padova_Sheet", [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Column1", type text}, {"Column2", type any}, {"Column3", type text}, {"Column4", type text}, {"Column5", type text}, {"Direzione Operativa Infrastratture Territoriale VE", type text}, {"Column7", type text}, {"Column8", type text}, {"Column9", type text}, {"Column10", type any}, {"Column11", type any}, {"Column12", type text}, {"Column13", type text}, {"Column14", type text}, {"Column15", type text}, {"Column16", type any}, {"Column17", type text}, {"Column18", type text}, {"Column19", type text}}),
+    #"Rimosse prime righe" = Table.Skip(#"Modificato tipo",7),
+    #"Intestazioni alzate di livello1" = Table.PromoteHeaders(#"Rimosse prime righe", [PromoteAllScalars=true]),
+    #"Modificato tipo1" = Table.TransformColumnTypes(#"Intestazioni alzate di livello1",{{"Codice Tratta INRETE", type text}, {"Tratta (descrizione)", type text}, {"Binario (P/D/L)", type text}, {"Inizio", type text}, {"Fine", type text}, {"chiave_RL", type text}, {"rid_vel (km/h)", type text}, {"Motivo", type text}, {"Titolare del rallentamento (matr.)", type text}, {"Data inizio", type date}, {"Ora inizio", type any}, {"Avviso Avaria", type text}, {"EA", type text}, {"CODICE ABBATTIMENTO ", type text}, {"UM", type text}, {"Pianificazione", type date}, {"Data fine", type text}, {"Ora fine", type text}}),
+    #"Righe vuote rimosse" = Table.SelectRows(#"Modificato tipo1", each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    #"Rimosse colonne" = Table.RemoveColumns(#"Righe vuote rimosse",{"Column19"}),
+    #"Righe vuote rimosse1" = Table.SelectRows(#"Rimosse colonne", each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    #"Aggiunta colonna personalizzata" = Table.AddColumn(#"Righe vuote rimosse1", "Linea", each "Bologna-Padova")
+in
+    #"Aggiunta colonna personalizzata"
+
+--------------------------------------------------------------------------------
+ QUERY 21/24  ->  TABELLA [ABBACO Mestre-Quarto]   (fonte: ABBA.CO.AGGIORNATO-RPC +++USARE QUESTO+++.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\ABBA.CO.AGGIORNATO-RPC +++USARE QUESTO+++.xlsx"), null, true),
+    #"Mestre-Quarto_Sheet" = Origine{[Item="Mestre-Quarto",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(#"Mestre-Quarto_Sheet", [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Column1", type text}, {"Column2", type any}, {"Column3", type text}, {"Column4", type text}, {"Column5", type text}, {"Direzione Operativa Infrastratture Territoriale VE", type text}, {"Column7", type text}, {"Column8", type text}, {"Column9", type text}, {"Column10", type text}, {"Column11", type text}, {"Column12", type text}, {"Column13", type text}, {"Column14", type text}, {"Column15", type any}, {"Column16", type text}, {"Column17", type text}, {"Column18", type text}}),
+    #"Rimosse prime righe" = Table.Skip(#"Modificato tipo",7),
+    #"Intestazioni alzate di livello1" = Table.PromoteHeaders(#"Rimosse prime righe", [PromoteAllScalars=true]),
+    #"Modificato tipo1" = Table.TransformColumnTypes(#"Intestazioni alzate di livello1",{{"Codice Tratta INRETE", type text}, {"Tratta (descrizione)", type any}, {"Binario (P/D/L)", type text}, {"Inizio", type text}, {"Fine", type text}, {"chiave_RL", type text}, {"rid_vel (km/h)", type text}, {"Motivo", type text}, {"Titolare del rallentamento (matr.)", type text}, {"Data inizio", type text}, {"Ora inizio", type text}, {"Avviso Avaria", type text}, {"EA", type text}, {"CODICE ABBATTIMENTO ", type text}, {"UM", type any}, {"Pianificazione", type text}, {"Data fine", type text}, {"Ora fine", type text}}),
+    #"Righe vuote rimosse" = Table.SelectRows(#"Modificato tipo1", each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    #"Aggiunta colonna personalizzata" = Table.AddColumn(#"Righe vuote rimosse", "Linea", each "Mestre-Quarto")
+in
+    #"Aggiunta colonna personalizzata"
+
+--------------------------------------------------------------------------------
+ QUERY 22/24  ->  TABELLA [ABBACO Mestre-Treviso]   (fonte: ABBA.CO.AGGIORNATO-RPC +++USARE QUESTO+++.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\ABBA.CO.AGGIORNATO-RPC +++USARE QUESTO+++.xlsx"), null, true),
+    #"Mestre-Treviso_Sheet" = Origine{[Item="Mestre-Treviso",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(#"Mestre-Treviso_Sheet", [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Column1", type text}, {"Column2", type any}, {"Column3", type text}, {"Column4", type text}, {"Column5", type text}, {"Direzione Operativa Infrastratture Territoriale VE", type text}, {"Column7", type text}, {"Column8", type text}, {"Column9", type text}, {"Column10", type any}, {"Column11", type any}, {"Column12", type text}, {"Column13", type text}, {"Column14", type text}, {"Column15", type any}, {"Column16", type text}, {"Column17", type text}, {"Column18", type text}, {"Column19", type any}, {"Column20", type text}}),
+    #"Rimosse colonne" = Table.RemoveColumns(#"Modificato tipo",{"Column19", "Column20"}),
+    #"Rimosse prime righe" = Table.Skip(#"Rimosse colonne",7),
+    #"Righe vuote rimosse" = Table.SelectRows(#"Rimosse prime righe", each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    #"Intestazioni alzate di livello1" = Table.PromoteHeaders(#"Righe vuote rimosse", [PromoteAllScalars=true]),
+    #"Modificato tipo1" = Table.TransformColumnTypes(#"Intestazioni alzate di livello1",{{"Codice Tratta INRETE", type text}, {"Tratta (descrizione)", type text}, {"Binario (P/D/L)", type text}, {"Inizio", type text}, {"Fine", type text}, {"chiave_RL", type text}, {"rid_vel (km/h)", type text}, {"Motivo", type text}, {"Titolare del rallentamento (matr.)", type text}, {"Data inizio", type date}, {"Ora inizio", type datetime}, {"Avviso Avaria", type text}, {"EA", type text}, {"CODICE ABBATTIMENTO ", type text}, {"UM", type any}, {"Pianificazione", type text}, {"Data fine", type text}, {"Ora fine", type text}}),
+    #"Aggiunta colonna personalizzata" = Table.AddColumn(#"Modificato tipo1", "Linea", each "Mestre-Treviso")
+in
+    #"Aggiunta colonna personalizzata"
+
+--------------------------------------------------------------------------------
+ QUERY 23/24  ->  TABELLA [ABBACO Milano-Venezia SL]   (fonte: ABBA.CO.AGGIORNATO-RPC +++USARE QUESTO+++.xlsx)
+--------------------------------------------------------------------------------
+let
+    Origine = Excel.Workbook(File.Contents("C:\Users\952192\OneDrive - Gruppo Ferrovie Dello Stato\AMPC\006 MONITORAGGI\DIFFETTI ARMAMENTO\REPORT\02 Base dati report\ABBA.CO.AGGIORNATO-RPC +++USARE QUESTO+++.xlsx"), null, true),
+    #"Milano-Venezia SL_Sheet" = Origine{[Item="Milano-Venezia SL",Kind="Sheet"]}[Data],
+    #"Intestazioni alzate di livello" = Table.PromoteHeaders(#"Milano-Venezia SL_Sheet", [PromoteAllScalars=true]),
+    #"Modificato tipo" = Table.TransformColumnTypes(#"Intestazioni alzate di livello",{{"Column1", type text}, {"Column2", type any}, {"Column3", type text}, {"Column4", type text}, {"Column5", type text}, {"Direzione Operativa Infrastratture Territoriale VE", type text}, {"Column7", type text}, {"Column8", type text}, {"Column9", type text}, {"Column10", type any}, {"Column11", type any}, {"Column12", type text}, {"Column13", type text}, {"Column14", type text}, {"Column15", type any}, {"Column16", type text}, {"Column17", type text}, {"Column18", type text}}),
+    #"Rimosse prime righe" = Table.Skip(#"Modificato tipo",7),
+    #"Intestazioni alzate di livello1" = Table.PromoteHeaders(#"Rimosse prime righe", [PromoteAllScalars=true]),
+    #"Modificato tipo1" = Table.TransformColumnTypes(#"Intestazioni alzate di livello1",{{"Codice Tratta INRETE", type text}, {"Tratta (descrizione)", type text}, {"Binario (P/D/L)", type text}, {"Inizio", type text}, {"Fine", type text}, {"chiave_RL", type text}, {"rid_vel", type text}, {"Motivo", type text}, {"Titolare del rallentamento (matr.)", type text}, {"Data inizio", type date}, {"Ora inizio", type datetime}, {"Avviso Avaria", type text}, {"EA", type text}, {"CODICE ABBATTIMENTO ", type text}, {"UM", type text}, {"Pianificazione", type text}, {"Data fine", type text}, {"Ora fine", type text}}),
+    #"Righe vuote rimosse" = Table.SelectRows(#"Modificato tipo1", each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    #"Aggiunta colonna personalizzata" = Table.AddColumn(#"Righe vuote rimosse", "Linea", each "Milano-Venezia SL")
+in
+    #"Aggiunta colonna personalizzata"
+
+--------------------------------------------------------------------------------
+ QUERY 24/24  ->  TABELLA [ABBACO]   (fonte: derivata)
+--------------------------------------------------------------------------------
+let
+    Origine = Table.Combine({#"ABBACO Bologna-Padova", #"ABBACO Mestre-Quarto", #"ABBACO Mestre-Treviso", #"ABBACO Milano-Venezia SL"}),
+    #"Caratteri iniziali estratti" = Table.TransformColumns(Origine, {{"Codice Tratta INRETE", each Text.Start(_, 6), type text}})
+in
+    #"Caratteri iniziali estratti"
+
+================================================================================
+ 6. REGOLE, TRASFORMAZIONI E PARTICOLARITÀ
+================================================================================
+
+  A. Percorsi: tutte le query puntano a percorsi locali OneDrive (utente 952192).
+     Per aggiornare i dati quei file devono esistere ed essere aggiornati.
+  B. File di testo: IW29_full.txt è letto con encoding 1252 (Windows-1252, non
+     UTF-8), saltando 3 righe di intestazione e dividendo per tabulatore; le date
+     arrivano come gg.mm.aaaa e vengono convertite sostituendo "." con "/" prima
+     della tipizzazione.
+  C. Colonne derivate in M (equivalgono a colonne calcolate): sono il cuore delle
+     regole di business. Le principali:
+       - IW67: "SeTe primo livello" (testo prima del "-"), "Anno avviso",
+         "Trimestre", "Stato" e "Cod. Stato" calcolati dalle date di fine
+         richiesta (MISC -> CHIUSO; scaduto, <10gg, <30gg, <60gg, >60gg),
+         "Km. rif.", "Km inizio", "Km fine" ricavati dalla colonna "Km.".
+       - IW39_STATO_ODL: "Stato OdL" derivato da "Stato sistema"
+         (TECC -> Chiuso, RIL -> Rilasciato, APER -> Aperto, CONC -> Concluso,
+         altrimenti n.d.).
+       - CAOR_ODL e CAOR_NTW: Table.Group con List.Min / List.Max / List.Sum per
+         ottenere prima e ultima consuntivazione e le ore totali.
+       - ABBACO*: aggiunta della colonna costante "Linea"; nella query ABBACO
+         unione delle 4 tratte e troncamento di "Codice Tratta INRETE" ai primi 6
+         caratteri (chiave di join verso LO-TR).
+  D. Tabella principale "ZSTMAIA1+2+7(VEM1+VEM2)+IW29_full" (124 colonne): unisce
+     ZSTMAIA1+2+7 (VEM1+VEM2), IW29_full e IK07_full. Da qui nascono le colonne
+     con prefisso di tabella ("ZSTMAIA2_full.xxx", "IW29_full.xxx",
+     "IK07_full.xxx") e le colonne di supporto usate dalle misure:
+     "PdM_definitivo_clone", "IW29_full.Avviso_clone",
+     "PdM non visibile in ZSTMAIA", "Tratta_definitiva".
+  E. Valori "n.d." e stringhe vuote vengono normalizzati in alcune query (es.
+     LO-TR su "Divis. ubic.") per evitare etichette vuote nei visual.
+
+================================================================================
+ 7. PAGINE DEL REPORT E CORRISPONDENZA CON LA WEB APP
+================================================================================
+
+  I nomi delle pagine corrispondono agli screenshot in LEGACY/SCREEN/ e, nella web
+  app React, ai componenti in src/components/pages/. La corrispondenza sotto è
+  dedotta dal nome del file e va verificata caso per caso sul componente.
+
+    LEGACY/SCREEN/Abbattimento Codici.png      ->  PageAbbaco.tsx
+    LEGACY/SCREEN/Avvisi V3 V4.png             ->  PageAvvisiV3V4.tsx
+    LEGACY/SCREEN/Avvisi V5.png                ->  PageAvvisiV5.tsx
+    LEGACY/SCREEN/Cerca per SeTe.png           ->  PageCercaSeTe.tsx
+    LEGACY/SCREEN/Dashboard V5.png             ->  PageDashboardV5.tsx
+    LEGACY/SCREEN/Drill V5.png                 ->  PageDrillV5.tsx
+    LEGACY/SCREEN/Drill frequenza V3 V4.png    ->  PageDrillFrequenzaV3V4.tsx
+    LEGACY/SCREEN/Frequenza V3 V4.png          ->  PageFrequenzaV3V4.tsx
+    LEGACY/SCREEN/Quick Use Guide.png          ->  PageQuickUserGuide.tsx
+
+  La web app replica i visual con il layout "pixel" del report: i componenti base
+  sono in src/components/pbi/primitives.tsx (PbiBox, PbiText, PbiShape, ...).
+
+  Nel repository esiste anche un ETL TypeScript (src/etl/queries.ts, master.ts,
+  pipeline.ts) con i dataset in src/data/*.json: replica in piccolo alcune delle
+  trasformazioni descritte in questo documento.
+
+================================================================================
+ FINE DEL DOCUMENTO
+================================================================================

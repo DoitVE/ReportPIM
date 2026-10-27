@@ -19,10 +19,10 @@ export const PowerBiHeader: React.FC<PowerBiHeaderProps> = ({
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
         {/* Left: Power BI & RFI Identity */}
         <div className="flex items-center space-x-3">
-          {/* Power BI Brand Icon */}
+          {/* Brand Icon */}
           <div className="flex items-center space-x-2">
-            <div className="w-7 h-7 bg-amber-400 rounded flex items-center justify-center font-bold text-slate-950 text-xs shadow-sm">
-              Pb
+            <div className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center font-bold text-slate-100 text-xs shadow-sm border border-slate-700">
+              PIM
             </div>
             <div>
               <div className="flex items-center space-x-2">

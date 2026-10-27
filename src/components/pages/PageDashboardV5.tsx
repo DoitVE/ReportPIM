@@ -405,21 +405,21 @@ export const PageDashboardV5: React.FC<PageDashboardV5Props> = ({
       <PbiShape x={489.4966190833958} y={93.28324567993991} w={171.1795642374155} h={97.12997746055598} z={60000} fill={PBI_COLORS.card} radius={8} />
 
       {/* ================= Intestazione ================= */}
-      <PbiBox x={39.8992443324937} y={11.788413098236775} w={249.37027707808562} h={74.35768261964735} z={11000}>
+      <PbiBox x={17} y={8} w={180} h={54} z={11000}>
         <img src="/assets/logo_ufficiale.png" alt="RFI" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }} />
       </PbiBox>
-      <PbiText x={17.229219143576824} y={92.49370277078086} w={343.6775818639798} h={27.20403022670025} z={5000}
-        text="Difetti di binario - DOIT VE" sizePt={20} bold color={RED} />
-      <PbiText x={18.1360201511335} y={125.13853904282115} w={299.24433249370276} h={24.483627204030224} z={14000}
-        text="Dashboard V5" sizePt={15} bold color={PBI_COLORS.textLight} />
-      <PbiText x={0.906801007556675} y={148.7153652392947} w={76.1712846347607} h={35.36523929471033} z={12000}
-        text="Dati al:" sizePt={11} color={PBI_COLORS.textMuted} vAlign="middle" />
-      <PbiText x={69.82367758186398} y={143.27455919395464} w={136.02015113350126} h={40.806045340050375} z={8000}
-        text={dataAggiornamento} sizePt={12} color={PBI_COLORS.textLight} vAlign="middle" />
+      <PbiText x={17} y={68} w={350} h={28} z={5000}
+        text="Difetti di binario - DOIT VE" sizePt={18} bold color={RED} />
+      <PbiText x={18} y={96} w={300} h={24} z={14000}
+        text="Dashboard V5" sizePt={14} bold color={PBI_COLORS.textLight} />
+      <PbiText x={18} y={122} w={60} h={20} z={12000}
+        text="Dati al:" sizePt={10} color={PBI_COLORS.textMuted} vAlign="middle" />
+      <PbiText x={80} y={122} w={140} h={20} z={8000}
+        text={dataAggiornamento} sizePt={11} color={PBI_COLORS.textLight} vAlign="middle" />
 
       {/* ================= Bottoni di navigazione ================= */}
-      <PbiButton x={0} y={0} w={99.74811083123424} h={39.8992443324937} z={15000} label="Indietro" sizePt={9} onClick={onBack} />
-      <PbiButton x={371.17998163452694} y={0.9616829451540195} w={122.22222222222221} h={40} z={22000} label="Reset Filtri" sizePt={9} onClick={handleResetFilters} />
+      <PbiButton x={371} y={0.96} w={122} h={32} z={22000} label="Reset Filtri" sizePt={9} onClick={handleResetFilters} />
+      <PbiButton x={0} y={0} w={80} h={28} z={15000} label="Indietro" sizePt={8} onClick={onBack} />
 
       {/* ================= Slicer ================= */}
       <PbiListSlicer x={380.8539250994024} y={40.86092727764772} w={105.1889168765743} h={62.569269521410575} z={17000}

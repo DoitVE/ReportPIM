@@ -168,6 +168,7 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
   const [selectedTipi, setSelectedTipi] = useState<string[]>([]);
   const [selectedStati, setSelectedStati] = useState<string[]>([]);
   const [selectedLinee, setSelectedLinee] = useState<string[]>([]);
+  const [selectedMapLocalita, setSelectedMapLocalita] = useState<string | null>(null);
 
   // Contenitore Leaflet
   const mapRef = useRef<HTMLDivElement>(null);
@@ -186,6 +187,7 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
     setSelectedTipi([]);
     setSelectedStati([]);
     setSelectedLinee([]);
+    setSelectedMapLocalita(null);
   };
 
   // Join LO-TR su numero avviso
@@ -232,11 +234,18 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
     };
   }), [iw67, avvByAvviso]);
 
-  // Anni disponibili (dal dataset, per lo slicer "Anno avviso")
+  // Anni disponibili: dinamici per mostrare sempre gli ultimi 5 anni dalla data più recente nei dati
   const anniOptions = useMemo(() => {
-    const set = new Set<string>();
-    rows.forEach((r) => { if (r.anno) set.add(r.anno); });
-    return Array.from(set).sort();
+    const set = new Set<number>();
+    rows.forEach((r) => {
+      const y = parseInt(r.anno, 10);
+      if (!isNaN(y) && y >= 1990 && y <= 2100) set.add(y);
+    });
+    const sorted = Array.from(set).sort((a, b) => a - b);
+    if (sorted.length === 0) return ['2023', '2024', '2025', '2026', '2027'];
+    const maxYear = sorted[sorted.length - 1];
+    const last5 = [maxYear - 4, maxYear - 3, maxYear - 2, maxYear - 1, maxYear];
+    return last5.map(String);
   }, [rows]);
 
   const filtered = useMemo(() => rows.filter((r) => {
@@ -247,8 +256,9 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
     if (selectedTipi.length > 0 && !selectedTipi.includes(r.tipo)) return false;
     if (selectedStati.length > 0 && !selectedStati.includes(r.stato)) return false;
     if (selectedLinee.length > 0 && !selectedLinee.includes(r.linea)) return false;
+    if (selectedMapLocalita && r.localita !== selectedMapLocalita) return false;
     return true;
-  }), [rows, selectedAnni, selectedTrimestri, selectedDivisioni, selectedUM, selectedTipi, selectedStati, selectedLinee]);
+  }), [rows, selectedAnni, selectedTrimestri, selectedDivisioni, selectedUM, selectedTipi, selectedStati, selectedLinee, selectedMapLocalita]);
 
   // Bar chart: CountNonNull(IW67.Avviso) per IW67.Stato
   const barData = useMemo(() => {
@@ -306,34 +316,59 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
     }, 200);
   }, []);
 
-  // Aggiornamento bubble (CountNonNull(Avviso) per località, fill #2F9292)
+  // Aggiornamento bubble (CountNonNull(Avviso) per località, fill #2F9292, cross-filtering al click)
   useEffect(() => {
     if (!markersLayerRef.current) return;
     markersLayerRef.current.clearLayers();
 
+    // Raggruppa i dati per punto/località
     const groups: Record<string, { lat: number; lng: number; count: number; name: string }> = {};
-    filtered.forEach((r) => {
-      const key = `${r.lat.toFixed(2)}_${r.lng.toFixed(2)}`;
+    rows.forEach((r) => {
+      if (selectedAnni.length > 0 && !selectedAnni.includes(r.anno)) return;
+      if (selectedTrimestri.length > 0 && !selectedTrimestri.includes(r.trimestre)) return;
+      if (selectedDivisioni.length > 0 && !selectedDivisioni.includes(r.divisione)) return;
+      if (selectedUM.length > 0 && !selectedUM.includes(r.lvu)) return;
+      if (selectedTipi.length > 0 && !selectedTipi.includes(r.tipo)) return;
+      if (selectedStati.length > 0 && !selectedStati.includes(r.stato)) return;
+      if (selectedLinee.length > 0 && !selectedLinee.includes(r.linea)) return;
+
+      const key = `${r.lat.toFixed(3)}_${r.lng.toFixed(3)}_${r.localita}`;
       if (!groups[key]) groups[key] = { lat: r.lat, lng: r.lng, count: 0, name: r.localita };
       groups[key].count++;
     });
 
     Object.values(groups).forEach((g) => {
+      const isSelected = selectedMapLocalita === g.name;
+      const isDimmed = selectedMapLocalita !== null && !isSelected;
       const radius = Math.min(14, Math.max(6, 6 + Math.sqrt(g.count)));
+
       L.circleMarker([g.lat, g.lng], {
-        radius,
-        fillColor: TEAL,
-        fillOpacity: 0.75,
-        color: '#154141',
-        weight: 1,
+        radius: isSelected ? radius + 2 : radius,
+        fillColor: isSelected ? '#5CE5E5' : TEAL,
+        fillOpacity: isDimmed ? 0.25 : isSelected ? 0.95 : 0.75,
+        color: isSelected ? '#FFFFFF' : '#154141',
+        weight: isSelected ? 2.5 : 1,
       })
         .bindTooltip(
-          `<div style="font-size:11px"><b>${g.name}</b><br/>Avvisi: ${g.count}</div>`,
+          `<div style="font-family:Segoe UI, sans-serif; font-size:11px; line-height:1.45; color:#FFF; min-width:145px; padding:2px;">
+            <div style="font-weight:700; color:#5CE5E5; margin-bottom:4px; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:3px;">
+              ${g.name || 'Località/Tratta'}
+            </div>
+            <div><span style="color:#B3B3B3">Latitudine:</span> <b>${g.lat.toFixed(5)}</b></div>
+            <div><span style="color:#B3B3B3">Longitudine:</span> <b>${g.lng.toFixed(5)}</b></div>
+            <div><span style="color:#B3B3B3">Num. difetti / avvisi:</span> <b style="color:#5CE5E5">${g.count}</b></div>
+            <div style="margin-top:5px; font-size:9px; color:#A0AEC0; font-style:italic;">
+              ${isSelected ? '✓ Filtro attivo (clicca per rimuovere)' : '👆 Clicca sul punto per filtrare la pagina'}
+            </div>
+          </div>`,
           { direction: 'top' },
         )
+        .on('click', () => {
+          setSelectedMapLocalita((prev) => (prev === g.name ? null : g.name));
+        })
         .addTo(markersLayerRef.current!);
     });
-  }, [filtered]);
+  }, [rows, selectedAnni, selectedTrimestri, selectedDivisioni, selectedUM, selectedTipi, selectedStati, selectedLinee, selectedMapLocalita]);
 
   return (
     <PbiCanvas>
@@ -358,17 +393,45 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiButton x={15} y={48} w={85} h={22} z={30000}
-        label="Reset Filtri" sizePt={8} onClick={handleResetFilters} />
 
       <PbiText x={170} y={8} w={330} h={26} z={2000}
         text="Difetti di livello e scartamento - DOIT VE" sizePt={16} bold color={RED} />
       <PbiText x={170} y={34} w={95} h={20} z={25000}
         text="Avvisi V3 e V4" sizePt={12} bold color={PBI_COLORS.textLight} />
-      <PbiText x={270} y={35} w={45} h={18} z={24000}
-        text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
-      <PbiText x={318} y={35} w={100} h={18} z={22000}
-        text={dataAggiornamento} sizePt={9.5} color={PBI_COLORS.textLight} vAlign="middle" />
+
+      {/* Dati al: + Data aggiornamento + Pulsante Reset Filtri compatto a destra */}
+      <PbiBox x={270} y={33} w={235} h={22} z={24000} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: fontSizePx(9), color: PBI_COLORS.textMuted }}>Dati al:</span>
+        <span style={{ fontSize: fontSizePx(9.5), color: PBI_COLORS.textLight }}>{dataAggiornamento}</span>
+        <button
+          onClick={handleResetFilters}
+          style={{
+            marginLeft: 4,
+            padding: '1px 7px',
+            fontSize: fontSizePx(7.5),
+            fontWeight: 600,
+            borderRadius: 3,
+            background: 'rgba(255,255,255,0.08)',
+            color: PBI_COLORS.textLight,
+            border: `1px solid ${PBI_COLORS.tileBorder}`,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            lineHeight: '16px',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+            e.currentTarget.style.borderColor = PBI_COLORS.textMuted;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+            e.currentTarget.style.borderColor = PBI_COLORS.tileBorder;
+          }}
+          title="Ripristina tutti i filtri della pagina"
+        >
+          Reset Filtri
+        </button>
+      </PbiBox>
 
       {/* ================= Etichette dei filtri ================= */}
       <PbiText x={22} y={72} w={175} h={16} z={2000}

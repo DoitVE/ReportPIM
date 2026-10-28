@@ -123,13 +123,18 @@ export function buildMaster(inp: MasterInputs): Table {
     return r["Tolto d'opera"];
   });
   t = addColumn(t, 'Anno', (r) => {
-    if (r['Pdm'] !== null && r['Data Scoperta'] !== null) return (r['Data Scoperta'] as Date).getFullYear();
-    if (r['IW29_full.Avviso'] !== null) {
-      const d = r['IW29_full.Data avviso'] as Date | null;
-      return d ? d.getFullYear() : null;
+    if (r['Pdm'] !== null && r['Data Scoperta'] !== null) {
+      const d = toDate(r['Data Scoperta']);
+      if (d) return d.getFullYear();
     }
-    const d = r['IK07_full.Data creazione'] as Date | null;
-    return d ? d.getFullYear() : null;
+    if (r['IW29_full.Avviso'] !== null) {
+      const d = toDate(r['IW29_full.Data avviso']);
+      if (d) return d.getFullYear();
+    }
+    const d = toDate(r['IK07_full.Data creazione']);
+    if (d) return d.getFullYear();
+    const dAgg = toDate(r['Data Agg.']);
+    return dAgg ? dAgg.getFullYear() : null;
   });
   t = transformColumnTypes(t, { Anno: 'int' });
   t = addColumn(t, 'Caratteri iniziali', (r) => textStart(r['Sede_tecnica_definitiva'], 6));

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { PdmV5Item } from '../../types';
 import {
   PbiCanvas,
@@ -202,20 +202,49 @@ export const PageCercaSeTe: React.FC<PageCercaSeTeProps> = ({
   const pdmOptions = useMemo(() => uniq((p) => p.pdm), [pdmList]);
   const sediList = useMemo(() => uniq((p) => p.sede_tecnica), [pdmList]);
 
+  const getItemYear = (item: PdmV5Item): number | undefined => {
+    if (typeof item.anno === 'number' && !Number.isNaN(item.anno)) return item.anno;
+    for (const d of [item.data_scoperta, item.data_creazione, item.data_creaz_avviso]) {
+      if (d) {
+        const m = /(\d{4})/.exec(d);
+        if (m) {
+          const y = parseInt(m[1], 10);
+          if (y >= 1990 && y <= 2100) return y;
+        }
+      }
+    }
+    return undefined;
+  };
+
   const anniDisponibili = useMemo(() => {
-    const anni = pdmList.map((p) => p.anno).filter((a): a is number => typeof a === 'number');
-    return anni.length ? anni : [];
+    const set = new Set<number>();
+    pdmList.forEach((p) => {
+      const y = getItemYear(p);
+      if (y !== undefined) set.add(y);
+    });
+    return Array.from(set).sort((a, b) => a - b);
   }, [pdmList]);
-  const [anno, setAnno] = useState<[number, number]>(() => {
-    const anni = pdmList.map((p) => p.anno).filter((a): a is number => typeof a === 'number');
-    return anni.length ? [Math.min(...anni), Math.max(...anni)] : [2026, 2026];
-  });
+
+  const defaultAnnoRange = useMemo((): [number, number] => {
+    if (anniDisponibili.length > 0) {
+      const minA = anniDisponibili[0];
+      const maxA = anniDisponibili[anniDisponibili.length - 1];
+      return [minA, maxA];
+    }
+    return [2020, 2026];
+  }, [anniDisponibili]);
+
+  const [anno, setAnno] = useState<[number, number]>(defaultAnnoRange);
+
+  useEffect(() => {
+    setAnno(defaultAnnoRange);
+  }, [defaultAnnoRange]);
 
   const handleResetFilters = () => {
     setSelAvviso([]);
     setSelPdm([]);
     setSelSede([]);
-    setAnno(anniDisponibili.length ? [Math.min(...anniDisponibili), Math.max(...anniDisponibili)] : [2026, 2026]);
+    setAnno(defaultAnnoRange);
   };
 
   const filtered = useMemo(() => pdmList.filter((item) => {
@@ -223,8 +252,9 @@ export const PageCercaSeTe: React.FC<PageCercaSeTeProps> = ({
     if (selPdm.length > 0 && !selPdm.includes(item.pdm)) return false;
     if (selSede.length > 0 && !selSede.includes(item.sede_tecnica)) return false;
     if (anniDisponibili.length > 0) {
-      if (item.anno === undefined) return false;
-      if (item.anno < anno[0] || item.anno > anno[1]) return false;
+      const y = getItemYear(item);
+      if (y === undefined) return false;
+      if (y < anno[0] || y > anno[1]) return false;
     }
     return true;
   }), [pdmList, selAvviso, selPdm, selSede, anno, anniDisponibili]);
@@ -240,12 +270,43 @@ export const PageCercaSeTe: React.FC<PageCercaSeTeProps> = ({
       <PbiBox x={55} y={8} w={130} h={36} z={8000}>
         <img src="/assets/logo_ufficiale.png" alt="RFI" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }} />
       </PbiBox>
-      <PbiButton x={55} y={48} w={85} h={22} z={20000} label="Reset Filtri" sizePt={8} onClick={handleResetFilters} />
 
       <PbiText x={195} y={8} w={270} h={26} z={0} text="Difetti di binario - DOIT VE" sizePt={16} bold color={RED} />
       <PbiText x={195} y={34} w={160} h={22} z={11000} text="Cerca per SeTe V5" sizePt={13} bold color={PBI_COLORS.textLight} />
-      <PbiText x={195} y={56} w={48} h={18} z={9000} text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} vAlign="middle" />
-      <PbiText x={245} y={56} w={140} h={18} z={5000} text={dataAggiornamento} sizePt={10} color={PBI_COLORS.textLight} vAlign="middle" />
+
+      {/* Dati al: + Data aggiornamento + Pulsante Reset Filtri compatto a destra */}
+      <PbiBox x={195} y={56} w={270} h={22} z={20000} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: fontSizePx(9), color: PBI_COLORS.textMuted }}>Dati al:</span>
+        <span style={{ fontSize: fontSizePx(9.5), color: PBI_COLORS.textLight }}>{dataAggiornamento}</span>
+        <button
+          onClick={handleResetFilters}
+          style={{
+            marginLeft: 4,
+            padding: '1px 7px',
+            fontSize: fontSizePx(7.5),
+            fontWeight: 600,
+            borderRadius: 3,
+            background: 'rgba(255,255,255,0.08)',
+            color: PBI_COLORS.textLight,
+            border: `1px solid ${PBI_COLORS.tileBorder}`,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            lineHeight: '16px',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+            e.currentTarget.style.borderColor = PBI_COLORS.textMuted;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+            e.currentTarget.style.borderColor = PBI_COLORS.tileBorder;
+          }}
+          title="Ripristina tutti i filtri della pagina"
+        >
+          Reset Filtri
+        </button>
+      </PbiBox>
 
       {/* ================= Slicer Superiori (y=10, h=125 per mostrare più sedi tecniche) ================= */}
       <PbiListSlicer

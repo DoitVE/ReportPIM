@@ -170,6 +170,7 @@ export const PageFrequenzaV3V4: React.FC<PageFrequenzaV3V4Props> = ({
   const [selScadenze, setSelScadenze] = useState<string[]>([]);
   const [selStati, setSelStati] = useState<string[]>([]);
   const [selLinee, setSelLinee] = useState<string[]>([]);
+  const [selectedMapLocalita, setSelectedMapLocalita] = useState<string | null>(null);
 
   const [selectedRowId, setSelectedRowId] = useState<string>('');
 
@@ -190,6 +191,7 @@ export const PageFrequenzaV3V4: React.FC<PageFrequenzaV3V4Props> = ({
     setSelScadenze([]);
     setSelStati([]);
     setSelLinee([]);
+    setSelectedMapLocalita(null);
   };
 
   // Aggregazione di frequenza: conteggi per Sede tecnica / Linea / Binario / Km
@@ -258,10 +260,19 @@ export const PageFrequenzaV3V4: React.FC<PageFrequenzaV3V4Props> = ({
     }));
   }, [iw67, avvisi]);
 
-  const anniOptions = useMemo(
-    () => Array.from(new Set(baseRows.map((r) => r.anno))).filter(Boolean).sort(),
-    [baseRows],
-  );
+  // Anni disponibili: dinamici per mostrare sempre gli ultimi 5 anni dalla data più recente nei dati
+  const anniOptions = useMemo(() => {
+    const set = new Set<number>();
+    baseRows.forEach((r) => {
+      const y = parseInt(r.anno, 10);
+      if (!isNaN(y) && y >= 1990 && y <= 2100) set.add(y);
+    });
+    const sorted = Array.from(set).sort((a, b) => a - b);
+    if (sorted.length === 0) return ['2023', '2024', '2025', '2026', '2027'];
+    const maxYear = sorted[sorted.length - 1];
+    const last5 = [maxYear - 4, maxYear - 3, maxYear - 2, maxYear - 1, maxYear];
+    return last5.map(String);
+  }, [baseRows]);
 
   const filtered = useMemo(() => baseRows.filter((r) => {
     if (selAnni.length > 0 && !selAnni.includes(r.anno)) return false;
@@ -272,8 +283,9 @@ export const PageFrequenzaV3V4: React.FC<PageFrequenzaV3V4Props> = ({
     if (selScadenze.length > 0 && !selScadenze.includes(r.scadenza)) return false;
     if (selStati.length > 0 && !selStati.includes(r.stato)) return false;
     if (selLinee.length > 0 && !selLinee.includes(r.linea)) return false;
+    if (selectedMapLocalita && r.localita !== selectedMapLocalita) return false;
     return true;
-  }), [baseRows, selAnni, selTrimestri, selDivisioni, selUm, selTipi, selScadenze, selStati, selLinee]);
+  }), [baseRows, selAnni, selTrimestri, selDivisioni, selUm, selTipi, selScadenze, selStati, selLinee, selectedMapLocalita]);
 
   // Tabella ordinata per frequenza (conteggio) decrescente
   const tableRows = useMemo(
@@ -356,35 +368,60 @@ export const PageFrequenzaV3V4: React.FC<PageFrequenzaV3V4Props> = ({
     }, 200);
   }, []);
 
-  // bubbleLayer: fill #99BD3C, stroke #4E601E, raggio 6..14
+  // bubbleLayer: fill #99BD3C, stroke #4E601E, raggio 6..14, cross-filtering al click
   useEffect(() => {
     if (!markersLayerRef.current || !mapInstanceRef.current) return;
     markersLayerRef.current.clearLayers();
 
     const groups: Record<string, { lat: number; lng: number; count: number; name: string; rowId: string }> = {};
-    filtered.forEach((r) => {
-      const key = `${r.lat.toFixed(2)}_${r.lng.toFixed(2)}`;
+    baseRows.forEach((r) => {
+      if (selAnni.length > 0 && !selAnni.includes(r.anno)) return;
+      if (selTrimestri.length > 0 && !selTrimestri.includes(r.trimestre)) return;
+      if (selDivisioni.length > 0 && !selDivisioni.includes(r.divisione)) return;
+      if (selUm.length > 0 && !selUm.includes(r.um)) return;
+      if (selTipi.length > 0 && !selTipi.includes(r.tipo)) return;
+      if (selScadenze.length > 0 && !selScadenze.includes(r.scadenza)) return;
+      if (selStati.length > 0 && !selStati.includes(r.stato)) return;
+      if (selLinee.length > 0 && !selLinee.includes(r.linea)) return;
+
+      const key = `${r.lat.toFixed(3)}_${r.lng.toFixed(3)}_${r.localita}`;
       if (!groups[key]) groups[key] = { lat: r.lat, lng: r.lng, count: 0, name: r.localita, rowId: r.id };
       groups[key].count += r.conteggio;
     });
 
     Object.values(groups).forEach((g) => {
+      const isSelected = selectedMapLocalita === g.name;
+      const isDimmed = selectedMapLocalita !== null && !isSelected;
       const radius = Math.min(14, Math.max(6, 6 + Math.sqrt(g.count)));
+
       L.circleMarker([g.lat, g.lng], {
-        radius,
-        fillColor: BIN_GREEN,
-        fillOpacity: 0.7,
-        color: '#4E601E',
-        weight: 1,
+        radius: isSelected ? radius + 2 : radius,
+        fillColor: isSelected ? '#C4E865' : BIN_GREEN,
+        fillOpacity: isDimmed ? 0.25 : isSelected ? 0.95 : 0.75,
+        color: isSelected ? '#FFFFFF' : '#4E601E',
+        weight: isSelected ? 2.5 : 1,
       })
         .bindTooltip(
-          `<div style="font-size:11px"><b>${g.name}</b><br/>Num. difetti: ${g.count}</div>`,
+          `<div style="font-family:Segoe UI, sans-serif; font-size:11px; line-height:1.45; color:#FFF; min-width:145px; padding:2px;">
+            <div style="font-weight:700; color:#C4E865; margin-bottom:4px; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:3px;">
+              ${g.name || 'Località/Tratta'}
+            </div>
+            <div><span style="color:#B3B3B3">Latitudine:</span> <b>${g.lat.toFixed(5)}</b></div>
+            <div><span style="color:#B3B3B3">Longitudine:</span> <b>${g.lng.toFixed(5)}</b></div>
+            <div><span style="color:#B3B3B3">Num. difetti:</span> <b style="color:#C4E865">${g.count}</b></div>
+            <div style="margin-top:5px; font-size:9px; color:#A0AEC0; font-style:italic;">
+              ${isSelected ? '✓ Filtro attivo (clicca per rimuovere)' : '👆 Clicca sul punto per filtrare la pagina'}
+            </div>
+          </div>`,
           { direction: 'top' },
         )
-        .on('click', () => setSelectedRowId(g.rowId))
+        .on('click', () => {
+          setSelectedRowId(g.rowId);
+          setSelectedMapLocalita((prev) => (prev === g.name ? null : g.name));
+        })
         .addTo(markersLayerRef.current!);
     });
-  }, [filtered]);
+  }, [baseRows, selAnni, selTrimestri, selDivisioni, selUm, selTipi, selScadenze, selStati, selLinee, selectedMapLocalita]);
 
   return (
     <PbiCanvas>
@@ -409,16 +446,45 @@ export const PageFrequenzaV3V4: React.FC<PageFrequenzaV3V4Props> = ({
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiButton x={15} y={48} w={85} h={22} z={33000} label="Reset Filtri" sizePt={8} onClick={handleResetFilters} />
 
       <PbiText x={170} y={8} w={330} h={26} z={2000}
         text="Difetti di livello e scartamento - DOIT VE" sizePt={16} bold color={ACCENT} />
       <PbiText x={170} y={34} w={115} h={20} z={28000}
         text="Frequenza V3 e V4" sizePt={12} bold color={PBI_COLORS.textLight} />
-      <PbiText x={290} y={35} w={45} h={18} z={27000}
-        text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
-      <PbiText x={338} y={35} w={100} h={18} z={25000}
-        text={dataAggiornamento} sizePt={9.5} color={PBI_COLORS.textLight} vAlign="middle" />
+
+      {/* Dati al: + Data aggiornamento + Pulsante Reset Filtri compatto a destra */}
+      <PbiBox x={290} y={33} w={230} h={22} z={27000} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: fontSizePx(9), color: PBI_COLORS.textMuted }}>Dati al:</span>
+        <span style={{ fontSize: fontSizePx(9.5), color: PBI_COLORS.textLight }}>{dataAggiornamento}</span>
+        <button
+          onClick={handleResetFilters}
+          style={{
+            marginLeft: 4,
+            padding: '1px 7px',
+            fontSize: fontSizePx(7.5),
+            fontWeight: 600,
+            borderRadius: 3,
+            background: 'rgba(255,255,255,0.08)',
+            color: PBI_COLORS.textLight,
+            border: `1px solid ${PBI_COLORS.tileBorder}`,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            lineHeight: '16px',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+            e.currentTarget.style.borderColor = PBI_COLORS.textMuted;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+            e.currentTarget.style.borderColor = PBI_COLORS.tileBorder;
+          }}
+          title="Ripristina tutti i filtri della pagina"
+        >
+          Reset Filtri
+        </button>
+      </PbiBox>
 
       {/* ================= Bottoni di navigazione ================= */}
       <PbiButton x={1150} y={672} w={110} h={34} z={41000} variant="light"

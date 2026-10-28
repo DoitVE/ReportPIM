@@ -73,6 +73,7 @@ export const PageAbbaco: React.FC<PageAbbacoProps> = ({
   // Slicer a tile ABBACO
   const [selectedLinee, setSelectedLinee] = useState<string[]>([]);
   const [selectedBinari, setSelectedBinari] = useState<string[]>([]);
+  const [selectedMapTratta, setSelectedMapTratta] = useState<string | null>(null);
 
   // Contenitore Leaflet
   const mapRef = useRef<HTMLDivElement>(null);
@@ -100,6 +101,7 @@ export const PageAbbaco: React.FC<PageAbbacoProps> = ({
     setSelectedUM([]);
     setSelectedLinee([]);
     setSelectedBinari([]);
+    setSelectedMapTratta(null);
   };
 
   // Filtri applicati alla tabella ABBA.CO
@@ -107,8 +109,9 @@ export const PageAbbaco: React.FC<PageAbbacoProps> = ({
     if (selectedLinee.length > 0 && !selectedLinee.includes(item.linea)) return false;
     if (selectedBinari.length > 0 && !selectedBinari.includes(item.binario)) return false;
     if (selectedUM.length > 0 && !selectedUM.includes(item.titolare)) return false;
+    if (selectedMapTratta && item.tratta !== selectedMapTratta) return false;
     return true;
-  }), [abbaco, selectedLinee, selectedBinari, selectedUM]);
+  }), [abbaco, selectedLinee, selectedBinari, selectedUM, selectedMapTratta]);
 
   // Bar chart "Numero Rallentamenti": Category = Linea, Y = CountNonNull(chiave_RL)
   const chartData = useMemo(() => {
@@ -162,35 +165,55 @@ export const PageAbbaco: React.FC<PageAbbacoProps> = ({
     }, 200);
   }, []);
 
-  // Aggiornamento marker (bubbleLayer: fill #F5C26B, raggio 6-14 in base al conteggio)
+  // Aggiornamento marker (bubbleLayer: fill #F5C26B, raggio 6-14 in base al conteggio, cross-filtering al click)
   useEffect(() => {
     if (!markersLayerRef.current || !mapInstanceRef.current) return;
     markersLayerRef.current.clearLayers();
 
     const groups: Record<string, { lat: number; lng: number; count: number; name: string }> = {};
-    filtered.forEach((item) => {
+    abbaco.forEach((item) => {
+      if (selectedLinee.length > 0 && !selectedLinee.includes(item.linea)) return;
+      if (selectedBinari.length > 0 && !selectedBinari.includes(item.binario)) return;
+      if (selectedUM.length > 0 && !selectedUM.includes(item.titolare)) return;
+
       const coords = lookupGpsCoordinates(undefined, item.tratta, item.km_inizio, item.linea);
-      const key = `${coords.lat.toFixed(2)}_${coords.lng.toFixed(2)}`;
+      const key = `${coords.lat.toFixed(3)}_${coords.lng.toFixed(3)}_${item.tratta}`;
       if (!groups[key]) groups[key] = { lat: coords.lat, lng: coords.lng, count: 0, name: item.tratta };
       groups[key].count++;
     });
 
     Object.values(groups).forEach((g) => {
+      const isSelected = selectedMapTratta === g.name;
+      const isDimmed = selectedMapTratta !== null && !isSelected;
       const radius = Math.min(14, Math.max(6, 6 + Math.sqrt(g.count)));
+
       L.circleMarker([g.lat, g.lng], {
-        radius,
-        fillColor: YELLOW,
-        fillOpacity: 0.7,
-        color: PBI_COLORS.textLight,
-        weight: 1,
+        radius: isSelected ? radius + 2 : radius,
+        fillColor: isSelected ? '#FFE082' : YELLOW,
+        fillOpacity: isDimmed ? 0.25 : isSelected ? 0.95 : 0.7,
+        color: isSelected ? '#FFFFFF' : PBI_COLORS.textLight,
+        weight: isSelected ? 2.5 : 1,
       })
         .bindTooltip(
-          `<div style="font-size:11px"><b>${g.name}</b><br/>Rallentamenti: ${g.count}</div>`,
+          `<div style="font-family:Segoe UI, sans-serif; font-size:11px; line-height:1.45; color:#FFF; min-width:145px; padding:2px;">
+            <div style="font-weight:700; color:#F5C26B; margin-bottom:4px; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:3px;">
+              ${g.name || 'Tratta'}
+            </div>
+            <div><span style="color:#B3B3B3">Latitudine:</span> <b>${g.lat.toFixed(5)}</b></div>
+            <div><span style="color:#B3B3B3">Longitudine:</span> <b>${g.lng.toFixed(5)}</b></div>
+            <div><span style="color:#B3B3B3">Rallentamenti:</span> <b style="color:#F5C26B">${g.count}</b></div>
+            <div style="margin-top:5px; font-size:9px; color:#A0AEC0; font-style:italic;">
+              ${isSelected ? '✓ Filtro attivo (clicca per rimuovere)' : '👆 Clicca sul punto per filtrare la pagina'}
+            </div>
+          </div>`,
           { direction: 'top' },
         )
+        .on('click', () => {
+          setSelectedMapTratta((prev) => (prev === g.name ? null : g.name));
+        })
         .addTo(markersLayerRef.current!);
     });
-  }, [filtered]);
+  }, [abbaco, selectedLinee, selectedBinari, selectedUM, selectedMapTratta]);
 
   return (
     <PbiCanvas>
@@ -211,17 +234,45 @@ export const PageAbbaco: React.FC<PageAbbacoProps> = ({
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiButton x={15} y={48} w={85} h={22} z={23000}
-        label="Reset Filtri" sizePt={8} onClick={handleResetFilters} />
 
       <PbiText x={170} y={8} w={330} h={26} z={14000}
         text="Abbattimento Codici - DOIT VE" sizePt={16} bold color={RED} />
       <PbiText x={170} y={34} w={75} h={20} z={18000}
         text="ABBA.CO" sizePt={12} bold color={PBI_COLORS.textLight} />
-      <PbiText x={250} y={35} w={45} h={18} z={17000}
-        text="Dati al:" sizePt={9} color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
-      <PbiText x={298} y={35} w={105} h={18} z={15000}
-        text={dataAggiornamento} sizePt={9.5} color={PBI_COLORS.textLight} vAlign="middle" />
+
+      {/* Dati al: + Data aggiornamento + Pulsante Reset Filtri compatto a destra */}
+      <PbiBox x={250} y={33} w={235} h={22} z={17000} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: fontSizePx(9), color: PBI_COLORS.textMuted }}>Dati al:</span>
+        <span style={{ fontSize: fontSizePx(9.5), color: PBI_COLORS.textLight }}>{dataAggiornamento}</span>
+        <button
+          onClick={handleResetFilters}
+          style={{
+            marginLeft: 4,
+            padding: '1px 7px',
+            fontSize: fontSizePx(7.5),
+            fontWeight: 600,
+            borderRadius: 3,
+            background: 'rgba(255,255,255,0.08)',
+            color: PBI_COLORS.textLight,
+            border: `1px solid ${PBI_COLORS.tileBorder}`,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            lineHeight: '16px',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+            e.currentTarget.style.borderColor = PBI_COLORS.textMuted;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+            e.currentTarget.style.borderColor = PBI_COLORS.tileBorder;
+          }}
+          title="Ripristina tutti i filtri della pagina"
+        >
+          Reset Filtri
+        </button>
+      </PbiBox>
 
       {/* ================= Etichette dei filtri ================= */}
       <PbiText x={22} y={72} w={85} h={16} z={9000}

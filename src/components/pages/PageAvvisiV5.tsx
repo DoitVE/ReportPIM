@@ -124,6 +124,7 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
   const [selectedScadenze, setSelectedScadenze] = useState<string[]>([]);
   const [selectedLinee, setSelectedLinee] = useState<string[]>([]);
   const [selectedClassificazioni, setSelectedClassificazioni] = useState<string[]>([]);
+  const [selectedMapLocalita, setSelectedMapLocalita] = useState<string | null>(null);
 
   // Riga selezionata (target del drill-through)
   const [selectedRowId, setSelectedRowId] = useState<string>(pdmList[0]?.pdm ?? '');
@@ -152,21 +153,58 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
     setSelectedScadenze([]);
     setSelectedLinee([]);
     setSelectedClassificazioni([]);
+    setSelectedMapLocalita(null);
   };
 
-  const filtered = useMemo(() => pdmList.filter((item) => {
+  // Helper per estrarre l'anno da un PdmV5Item (da campo anno o parse date)
+  const getItemYear = (item: PdmV5Item): number | undefined => {
+    if (typeof item.anno === 'number' && !Number.isNaN(item.anno)) return item.anno;
+    for (const d of [item.data_scoperta, item.data_creazione, item.data_creaz_avviso]) {
+      if (d) {
+        const m = /(\d{4})/.exec(d);
+        if (m) {
+          const y = parseInt(m[1], 10);
+          if (y >= 1990 && y <= 2100) return y;
+        }
+      }
+    }
+    return undefined;
+  };
+
+  /**
+   * Filtri a livello di pagina Power BI ("Filtri in questa pagina" / filtri oggetto visivo):
+   * 1) Anno: è maggiore di 2020 (> 2020)
+   * 2) Classificazione stato: appartiene ai 5 stati aperti/in gestione
+   *    (esclude 'Pdm chiuso - Avv. chiuso' e gli stati vuoti).
+   */
+  const pageBaseItems = useMemo(() => {
+    return pdmList.filter((item) => {
+      // 1) Anno > 2020: se l'anno è determinabile, deve essere > 2020
+      const y = getItemYear(item);
+      if (y !== undefined && y <= 2020) return false;
+
+      // 2) Classificazione stato: deve essere uno dei 5 stati aperti
+      const c = item.classificazione_stato;
+      if (!c || c === 'Pdm chiuso - Avv. chiuso' || !CLASSIFICAZIONI.includes(c)) return false;
+
+      return true;
+    });
+  }, [pdmList]);
+
+  const filtered = useMemo(() => pageBaseItems.filter((item) => {
     if (selectedDivisioni.length > 0 && !selectedDivisioni.includes(item.divisione)) return false;
     if (selectedUM.length > 0 && !selectedUM.includes(item.lvu)) return false;
     if (selectedClassi.length > 0 && !selectedClassi.includes(item.classe)) return false;
     if (selectedScadenze.length > 0 && !selectedScadenze.includes(item.scadenza)) return false;
     if (selectedLinee.length > 0 && !selectedLinee.includes(item.linea)) return false;
     if (selectedClassificazioni.length > 0 && !selectedClassificazioni.includes(item.classificazione_stato)) return false;
+    if (selectedMapLocalita && item.localita_tratta !== selectedMapLocalita) return false;
     return true;
-  }), [pdmList, selectedDivisioni, selectedUM, selectedClassi, selectedScadenze, selectedLinee, selectedClassificazioni]);
+  }), [pageBaseItems, selectedDivisioni, selectedUM, selectedClassi, selectedScadenze, selectedLinee, selectedClassificazioni, selectedMapLocalita]);
 
   const selectedItem = useMemo(
-    () => filtered.find((p) => p.pdm === selectedRowId) ?? filtered[0] ?? pdmList[0],
-    [filtered, selectedRowId, pdmList],
+    () => filtered.find((p) => p.pdm === selectedRowId) ?? filtered[0] ?? pageBaseItems[0] ?? pdmList[0],
+    [filtered, selectedRowId, pageBaseItems, pdmList],
   );
 
   // Righe tabella ordinate per "Fine Rich." ascendente (sort del PBIR)
@@ -229,39 +267,62 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
     }, 200);
   }, []);
 
-  // Aggiornamento marker (bubbleLayer: fill #F26D6D, raggio da 6 a 14)
+  // Aggiornamento marker (bubbleLayer: fill #F26D6D, raggio da 6 a 14, cross-filtering al click)
   useEffect(() => {
     if (!markersLayerRef.current || !mapInstanceRef.current) return;
     markersLayerRef.current.clearLayers();
 
     const groups: Record<string, { lat: number; lng: number; count: number; name: string; items: PdmV5Item[] }> = {};
-    filtered.forEach((item) => {
+    pageBaseItems.forEach((item) => {
+      if (selectedDivisioni.length > 0 && !selectedDivisioni.includes(item.divisione)) return;
+      if (selectedUM.length > 0 && !selectedUM.includes(item.lvu)) return;
+      if (selectedClassi.length > 0 && !selectedClassi.includes(item.classe)) return;
+      if (selectedScadenze.length > 0 && !selectedScadenze.includes(item.scadenza)) return;
+      if (selectedLinee.length > 0 && !selectedLinee.includes(item.linea)) return;
+      if (selectedClassificazioni.length > 0 && !selectedClassificazioni.includes(item.classificazione_stato)) return;
+
       const coords = item.lat && item.lng
         ? { lat: item.lat, lng: item.lng }
         : lookupGpsCoordinates(item.sede_tecnica, item.localita_tratta, item.km_linea, item.linea);
-      const key = `${coords.lat.toFixed(2)}_${coords.lng.toFixed(2)}`;
+      const key = `${coords.lat.toFixed(3)}_${coords.lng.toFixed(3)}_${item.localita_tratta}`;
       if (!groups[key]) groups[key] = { lat: coords.lat, lng: coords.lng, count: 0, name: item.localita_tratta, items: [] };
       groups[key].count++;
       groups[key].items.push(item);
     });
 
     Object.values(groups).forEach((g) => {
+      const isSelected = selectedMapLocalita === g.name;
+      const isDimmed = selectedMapLocalita !== null && !isSelected;
       const radius = Math.min(14, Math.max(6, 6 + Math.sqrt(g.count)));
+
       L.circleMarker([g.lat, g.lng], {
-        radius,
-        fillColor: PBI_COLORS.accent,
-        fillOpacity: 0.7,
-        color: PBI_COLORS.textPrimary,
-        weight: 1,
+        radius: isSelected ? radius + 2 : radius,
+        fillColor: isSelected ? '#FFA0A0' : PBI_COLORS.accent,
+        fillOpacity: isDimmed ? 0.25 : isSelected ? 0.95 : 0.75,
+        color: isSelected ? '#FFFFFF' : PBI_COLORS.textPrimary,
+        weight: isSelected ? 2.5 : 1,
       })
         .bindTooltip(
-          `<div style="font-size:11px"><b>${g.name}</b><br/>Punti di misura: ${g.count}</div>`,
+          `<div style="font-family:Segoe UI, sans-serif; font-size:11px; line-height:1.45; color:#FFF; min-width:145px; padding:2px;">
+            <div style="font-weight:700; color:#F26D6D; margin-bottom:4px; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:3px;">
+              ${g.name || 'Località/Tratta'}
+            </div>
+            <div><span style="color:#B3B3B3">Latitudine:</span> <b>${g.lat.toFixed(5)}</b></div>
+            <div><span style="color:#B3B3B3">Longitudine:</span> <b>${g.lng.toFixed(5)}</b></div>
+            <div><span style="color:#B3B3B3">Punti di misura:</span> <b style="color:#F26D6D">${g.count}</b></div>
+            <div style="margin-top:5px; font-size:9px; color:#A0AEC0; font-style:italic;">
+              ${isSelected ? '✓ Filtro attivo (clicca per rimuovere)' : '👆 Clicca sul punto per filtrare la pagina'}
+            </div>
+          </div>`,
           { direction: 'top' },
         )
-        .on('click', () => { if (g.items[0]) setSelectedRowId(g.items[0].pdm); })
+        .on('click', () => {
+          if (g.items[0]) setSelectedRowId(g.items[0].pdm);
+          setSelectedMapLocalita((prev) => (prev === g.name ? null : g.name));
+        })
         .addTo(markersLayerRef.current!);
     });
-  }, [filtered]);
+  }, [pageBaseItems, selectedDivisioni, selectedUM, selectedClassi, selectedScadenze, selectedLinee, selectedClassificazioni, selectedMapLocalita]);
 
   return (
     <PbiCanvas>
@@ -285,15 +346,44 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiButton x={15} y={48} w={85} h={22} z={25000} label="Reset Filtri" sizePt={8} onClick={handleResetFilters} />
 
       <PbiText x={170} y={8} w={325} h={26} z={16000}
         text="Difetti di binario - DOIT VE" sizePt={16} bold color={PBI_COLORS.accent} />
       <PbiText x={170} y={34} w={80} h={20} z={20000} text="Avvisi V5" sizePt={12} bold color={PBI_COLORS.textLight} />
-      <PbiText x={255} y={35} w={45} h={18} z={19000} text="Dati al:" sizePt={9}
-        color={PBI_COLORS.textMuted} align="right" vAlign="middle" />
-      <PbiText x={305} y={35} w={140} h={18} z={17000} text={dataAggiornamento} sizePt={9.5}
-        color={PBI_COLORS.textLight} vAlign="middle" />
+
+      {/* Dati al: + Data aggiornamento + Pulsante Reset Filtri compatto a destra */}
+      <PbiBox x={255} y={33} w={245} h={22} z={25000} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: fontSizePx(9), color: PBI_COLORS.textMuted }}>Dati al:</span>
+        <span style={{ fontSize: fontSizePx(9.5), color: PBI_COLORS.textLight }}>{dataAggiornamento}</span>
+        <button
+          onClick={handleResetFilters}
+          style={{
+            marginLeft: 4,
+            padding: '1px 7px',
+            fontSize: fontSizePx(7.5),
+            fontWeight: 600,
+            borderRadius: 3,
+            background: 'rgba(255,255,255,0.08)',
+            color: PBI_COLORS.textLight,
+            border: `1px solid ${PBI_COLORS.tileBorder}`,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            lineHeight: '16px',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+            e.currentTarget.style.borderColor = PBI_COLORS.textMuted;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+            e.currentTarget.style.borderColor = PBI_COLORS.tileBorder;
+          }}
+          title="Ripristina tutti i filtri della pagina"
+        >
+          Reset Filtri
+        </button>
+      </PbiBox>
 
       {/* ---------------- Etichette dei filtri ---------------- */}
       <PbiText x={20} y={72} w={100} h={16} z={9000}

@@ -243,10 +243,6 @@ export const PageDrillV5: React.FC<PageDrillV5Props> = ({
           style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'left center' }}
         />
       </PbiBox>
-      <PbiButton
-        x={52} y={48} w={85} h={22} z={44000}
-        label="Reset Filtri" sizePt={8} onClick={handleResetFilters}
-      />
 
       {/* Slicer Cerca Avviso */}
       <PbiListSlicer
@@ -299,14 +295,39 @@ export const PageDrillV5: React.FC<PageDrillV5Props> = ({
         x={345} y={117} w={90} h={24} z={37000}
         text="Drill V5" sizePt={15} bold color={TEXT_LIGHT}
       />
-      <PbiText
-        x={440} y={120} w={125} h={20} z={34000}
-        text="Dati aggiornati al:" sizePt={10} color={MUTED} vAlign="middle"
-      />
-      <PbiText
-        x={565} y={120} w={140} h={20} z={13000}
-        text={dataAggiornamento} sizePt={10.5} color={TEXT_LIGHT} vAlign="middle"
-      />
+      {/* Dati aggiornati al: + Data aggiornamento + Pulsante Reset Filtri compatto a destra */}
+      <PbiBox x={440} y={118} w={350} h={24} z={34000} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: fontSizePx(10), color: MUTED }}>Dati aggiornati al:</span>
+        <span style={{ fontSize: fontSizePx(10.5), color: TEXT_LIGHT }}>{dataAggiornamento}</span>
+        <button
+          onClick={handleResetFilters}
+          style={{
+            marginLeft: 6,
+            padding: '1px 7px',
+            fontSize: fontSizePx(7.5),
+            fontWeight: 600,
+            borderRadius: 3,
+            background: 'rgba(255,255,255,0.08)',
+            color: TEXT_LIGHT,
+            border: `1px solid ${PBI_COLORS.tileBorder}`,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            lineHeight: '16px',
+            transition: 'all 0.15s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+            e.currentTarget.style.borderColor = MUTED;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+            e.currentTarget.style.borderColor = PBI_COLORS.tileBorder;
+          }}
+          title="Ripristina tutti i filtri della pagina"
+        >
+          Reset Filtri
+        </button>
+      </PbiBox>
 
       {/* ================= SEZIONE DATI PDM (y=155 a 465) ================= */}
       <PbiText x={20} y={156} w={150} h={22} z={30000} text="Dati PdM" sizePt={11} bold color={TEXT_LIGHT} />

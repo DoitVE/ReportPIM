@@ -11,6 +11,7 @@ import {
   formatDate,
   isBlank,
   toText,
+  toDate,
 } from './helpers';
 import {
   SourceFiles,
@@ -370,7 +371,9 @@ function mapPdm(r: Row, loTr: Map<string, LoTrInfo>): PdmV5Item {
     id_saldatore: fmt(r['ZSTMAIA2_full.ID saldatore']),
     creato_da: fmt(r['IK07_full.Creato da']),
     cod_linea: fmt(r['ZSTMAIA2_full.Cod. linea']),
-    anno: typeof r['Anno'] === 'number' ? (r['Anno'] as number) : undefined,
+    anno: typeof r['Anno'] === 'number'
+      ? (r['Anno'] as number)
+      : (Number(r['Anno']) || toDate(r['Data Scoperta'] ?? r['IW29_full.Data avviso'] ?? r['IK07_full.Data creazione'] ?? r['Data Agg.'])?.getFullYear() || undefined),
     testo_esteso: fmt(r['ZAVVISI_TXT.Testo Esteso']),
     inizio_richiesta: fmt(r['IW29_full.In. rich.']),
     data_chiusura: fmt(r['IW29_full.Data chiusura']),

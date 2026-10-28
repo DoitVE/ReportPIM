@@ -133,6 +133,7 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const trackBoundsRef = useRef<L.LatLngBounds | null>(null);
 
   // Elenco linee InRete (master Power BI + eventuali valori a dataset)
   const lineeList = useMemo(() => {
@@ -154,6 +155,10 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
     setSelectedLinee([]);
     setSelectedClassificazioni([]);
     setSelectedMapLocalita(null);
+
+    if (mapInstanceRef.current && trackBoundsRef.current) {
+      mapInstanceRef.current.flyToBounds(trackBoundsRef.current, { padding: [12, 12], duration: 0.8 });
+    }
   };
 
   // Helper per estrarre l'anno da un PdmV5Item (da campo anno o parse date)
@@ -241,14 +246,13 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
       maxZoom: 16,
     }).addTo(map);
 
-    let trackBounds: L.LatLngBounds | null = null;
     try {
       const geoLayer = L.geoJSON(rfiTracksGeoJson as any, {
         style: () => ({ color: PBI_COLORS.textLight, weight: 2, opacity: 0.85 }),
       }).addTo(map);
       const bounds = geoLayer.getBounds();
       if (bounds.isValid()) {
-        trackBounds = bounds;
+        trackBoundsRef.current = bounds;
         map.fitBounds(bounds, { padding: [12, 12] });
       }
     } catch (e) {
@@ -261,13 +265,13 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
 
     setTimeout(() => {
       map.invalidateSize();
-      if (trackBounds && trackBounds.isValid()) {
-        map.fitBounds(trackBounds, { padding: [12, 12] });
+      if (trackBoundsRef.current && trackBoundsRef.current.isValid()) {
+        map.fitBounds(trackBoundsRef.current, { padding: [12, 12] });
       }
     }, 200);
   }, []);
 
-  // Aggiornamento marker (bubbleLayer: fill #F26D6D, raggio da 6 a 14, cross-filtering al click)
+  // Aggiornamento marker (bubbleLayer: fill #F26D6D, raggio da 6 a 14, cross-filtering al click + zoom)
   useEffect(() => {
     if (!markersLayerRef.current || !mapInstanceRef.current) return;
     markersLayerRef.current.clearLayers();
@@ -284,7 +288,7 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
       const coords = item.lat && item.lng
         ? { lat: item.lat, lng: item.lng }
         : lookupGpsCoordinates(item.sede_tecnica, item.localita_tratta, item.km_linea, item.linea);
-      const key = `${coords.lat.toFixed(3)}_${coords.lng.toFixed(3)}_${item.localita_tratta}`;
+      const key = `${coords.lat.toFixed(4)}_${coords.lng.toFixed(4)}_${item.localita_tratta}`;
       if (!groups[key]) groups[key] = { lat: coords.lat, lng: coords.lng, count: 0, name: item.localita_tratta, items: [] };
       groups[key].count++;
       groups[key].items.push(item);
@@ -295,32 +299,53 @@ export const PageAvvisiV5: React.FC<PageAvvisiV5Props> = ({
       const isDimmed = selectedMapLocalita !== null && !isSelected;
       const radius = Math.min(14, Math.max(6, 6 + Math.sqrt(g.count)));
 
-      L.circleMarker([g.lat, g.lng], {
-        radius: isSelected ? radius + 2 : radius,
+      const latStr = g.lat.toFixed(8).replace('.', ',');
+      const lngStr = g.lng.toFixed(8).replace('.', ',');
+
+      const tooltipContent = `
+        <div style="font-family: 'Segoe UI', system-ui, sans-serif; font-size: 11px; color: #111827; background: #ffffff; border-radius: 4px; padding: 6px 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); line-height: 1.5; min-width: 190px;">
+          <div style="display: flex; justify-content: space-between; gap: 12px; margin-bottom: 2px;">
+            <span style="color: #6b7280; font-size: 10px;">Latitudine</span>
+            <span style="font-weight: 600; font-family: monospace; color: #111827;">${latStr}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; gap: 12px; margin-bottom: 2px;">
+            <span style="color: #6b7280; font-size: 10px;">Longitudine</span>
+            <span style="font-weight: 600; font-family: monospace; color: #111827;">${lngStr}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; gap: 12px; margin-bottom: 2px;">
+            <span style="color: #6b7280; font-size: 10px;">PdM/Avviso</span>
+            <span style="font-weight: 700; color: #dc2626;">${g.count}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; gap: 12px; margin-top: 3px; border-top: 1px solid #e5e7eb; padding-top: 3px;">
+            <span style="color: #6b7280; font-size: 10px; white-space: nowrap;">Prime Località/Tratta</span>
+            <span style="font-weight: 700; color: #111827; text-align: right;">${g.name || 'Località'}</span>
+          </div>
+        </div>
+      `;
+
+      const marker = L.circleMarker([g.lat, g.lng], {
+        radius: isSelected ? radius + 3 : radius,
         fillColor: isSelected ? '#FFA0A0' : PBI_COLORS.accent,
-        fillOpacity: isDimmed ? 0.25 : isSelected ? 0.95 : 0.75,
+        fillOpacity: isDimmed ? 0.2 : isSelected ? 0.95 : 0.75,
         color: isSelected ? '#FFFFFF' : PBI_COLORS.textPrimary,
         weight: isSelected ? 2.5 : 1,
       })
-        .bindTooltip(
-          `<div style="font-family:Segoe UI, sans-serif; font-size:11px; line-height:1.45; color:#FFF; min-width:145px; padding:2px;">
-            <div style="font-weight:700; color:#F26D6D; margin-bottom:4px; font-size:12px; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:3px;">
-              ${g.name || 'Località/Tratta'}
-            </div>
-            <div><span style="color:#B3B3B3">Latitudine:</span> <b>${g.lat.toFixed(5)}</b></div>
-            <div><span style="color:#B3B3B3">Longitudine:</span> <b>${g.lng.toFixed(5)}</b></div>
-            <div><span style="color:#B3B3B3">Punti di misura:</span> <b style="color:#F26D6D">${g.count}</b></div>
-            <div style="margin-top:5px; font-size:9px; color:#A0AEC0; font-style:italic;">
-              ${isSelected ? '✓ Filtro attivo (clicca per rimuovere)' : '👆 Clicca sul punto per filtrare la pagina'}
-            </div>
-          </div>`,
-          { direction: 'top' },
-        )
+        .bindTooltip(tooltipContent, { direction: 'top', className: 'pbi-azure-tooltip', opacity: 0.98 })
         .on('click', () => {
           if (g.items[0]) setSelectedRowId(g.items[0].pdm);
-          setSelectedMapLocalita((prev) => (prev === g.name ? null : g.name));
-        })
-        .addTo(markersLayerRef.current!);
+          const nextSelected = selectedMapLocalita === g.name ? null : g.name;
+          setSelectedMapLocalita(nextSelected);
+
+          if (mapInstanceRef.current) {
+            if (nextSelected) {
+              mapInstanceRef.current.flyTo([g.lat, g.lng], 13, { animate: true, duration: 0.8 });
+            } else if (trackBoundsRef.current) {
+              mapInstanceRef.current.flyToBounds(trackBoundsRef.current, { padding: [12, 12], duration: 0.8 });
+            }
+          }
+        });
+
+      marker.addTo(markersLayerRef.current!);
     });
   }, [pageBaseItems, selectedDivisioni, selectedUM, selectedClassi, selectedScadenze, selectedLinee, selectedClassificazioni, selectedMapLocalita]);
 

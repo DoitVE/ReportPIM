@@ -48,3 +48,14 @@
 .leaflet-popup-tip {
   background: #1e293b !important;
 }
+
+/* Power BI Azure Maps style Tooltip */
+.leaflet-tooltip.pbi-azure-tooltip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+.leaflet-tooltip.pbi-azure-tooltip::before {
+  display: none !important;
+}

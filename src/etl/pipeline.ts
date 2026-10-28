@@ -371,9 +371,15 @@ function mapPdm(r: Row, loTr: Map<string, LoTrInfo>): PdmV5Item {
     id_saldatore: fmt(r['ZSTMAIA2_full.ID saldatore']),
     creato_da: fmt(r['IK07_full.Creato da']),
     cod_linea: fmt(r['ZSTMAIA2_full.Cod. linea']),
-    anno: typeof r['Anno'] === 'number'
+    anno: (typeof r['Anno'] === 'number' && !Number.isNaN(r['Anno']))
       ? (r['Anno'] as number)
-      : (Number(r['Anno']) || toDate(r['Data Scoperta'] ?? r['IW29_full.Data avviso'] ?? r['IK07_full.Data creazione'] ?? r['Data Agg.'])?.getFullYear() || undefined),
+      : (Number(r['Anno']) ||
+          toDate(r['Data Scoperta'])?.getFullYear() ||
+          toDate(r['IW29_full.Data avviso'])?.getFullYear() ||
+          toDate(r['IK07_full.Data creazione'])?.getFullYear() ||
+          toDate(r['Data Agg.'])?.getFullYear() ||
+          toDate(r['Data creazione'] ?? r['IW29_full.Data cr.'])?.getFullYear() ||
+          undefined),
     testo_esteso: fmt(r['ZAVVISI_TXT.Testo Esteso']),
     inizio_richiesta: fmt(r['IW29_full.In. rich.']),
     data_chiusura: fmt(r['IW29_full.Data chiusura']),

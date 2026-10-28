@@ -22,6 +22,7 @@ import {
 const eq = (a: any, b: any): boolean => (a === null || a === undefined) === (b === null || b === undefined) && a === b;
 const lt = (a: Date | null, b: Date | null): boolean => !!a && !!b && a.getTime() < b.getTime();
 const gt = (a: Date | null, b: Date | null): boolean => !!a && !!b && a.getTime() > b.getTime();
+const isBlank = (val: any): boolean => val === null || val === undefined || String(val).trim() === '';
 
 export interface MasterInputs {
   zstmaia1: Table;
@@ -123,18 +124,28 @@ export function buildMaster(inp: MasterInputs): Table {
     return r["Tolto d'opera"];
   });
   t = addColumn(t, 'Anno', (r) => {
-    if (r['Pdm'] !== null && r['Data Scoperta'] !== null) {
-      const d = toDate(r['Data Scoperta']);
-      if (d) return d.getFullYear();
+    // 1) Se Pdm e Data Scoperta sono valorizzati con data valida
+    const ds = toDate(r['Data Scoperta']);
+    if (!isBlank(r['Pdm']) && ds !== null) {
+      return ds.getFullYear();
     }
-    if (r['IW29_full.Avviso'] !== null) {
-      const d = toDate(r['IW29_full.Data avviso']);
-      if (d) return d.getFullYear();
+    // 2) Altrimenti se IW29_full.Avviso è valorizzato
+    const da = toDate(r['IW29_full.Data avviso']);
+    if (!isBlank(r['IW29_full.Avviso']) && da !== null) {
+      return da.getFullYear();
     }
-    const d = toDate(r['IK07_full.Data creazione']);
-    if (d) return d.getFullYear();
+    // 3) Altrimenti Data creazione da IK07_full
+    const dc = toDate(r['IK07_full.Data creazione']);
+    if (dc !== null) {
+      return dc.getFullYear();
+    }
+    // 4) Fallback data aggiornamento / data creazione generale
     const dAgg = toDate(r['Data Agg.']);
-    return dAgg ? dAgg.getFullYear() : null;
+    if (dAgg !== null) {
+      return dAgg.getFullYear();
+    }
+    const dCr = toDate(r['Data creazione'] ?? r['IW29_full.Data cr.']);
+    return dCr ? dCr.getFullYear() : null;
   });
   t = transformColumnTypes(t, { Anno: 'int' });
   t = addColumn(t, 'Caratteri iniziali', (r) => textStart(r['Sede_tecnica_definitiva'], 6));

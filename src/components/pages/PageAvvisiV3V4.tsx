@@ -40,8 +40,9 @@ const TRIMESTRI = ['1', '2', '3', '4'];
 const DIVISIONI = ['VEM1', 'VEM2'];
 const UNITA_MANUTENTIVE = ['LVU1', 'LVU2', 'LVU3', 'LVU4'];
 const TIPI = ['V3', 'V4'];
-/** Bucket di `IW67.Stato` (derivati da St.sist. + Data Fine Richiesta, come la query PBIR). */
-const STATI_SCADENZA = ['SCAD.>60GG', 'SCAD.<60GG', 'SCAD.<30GG', 'SCAD.<10GG', 'SCADUTO', 'CHIUSO'];
+/** Bucket attivi di `IW67.Stato` nel visual Power BI (esclude CHIUSO). */
+const STATI_SCADENZA = ['SCAD.<10GG', 'SCAD.<30GG', 'SCAD.<60GG', 'SCAD.>60GG', 'SCADUTO'];
+const STATI_BAR_ORDER = ['SCAD.>60GG', 'SCAD.<60GG', 'SCAD.<30GG', 'SCADUTO', 'SCAD.<10GG'];
 
 const DAY_MS = 86_400_000;
 
@@ -234,10 +235,13 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
     };
   }), [iw67, avvByAvviso]);
 
+  // Filtro a livello di pagina Power BI: Difetti aperti/attivi (esclude CHIUSO / MISC)
+  const baseRows = useMemo(() => rows.filter((r) => r.stato !== 'CHIUSO' && r.statoSist !== 'MISC'), [rows]);
+
   // Anni disponibili: dinamici per mostrare sempre gli ultimi 5 anni dalla data più recente nei dati
   const anniOptions = useMemo(() => {
     const set = new Set<number>();
-    rows.forEach((r) => {
+    baseRows.forEach((r) => {
       const y = parseInt(r.anno, 10);
       if (!isNaN(y) && y >= 1990 && y <= 2100) set.add(y);
     });
@@ -246,9 +250,9 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
     const maxYear = sorted[sorted.length - 1];
     const last5 = [maxYear - 4, maxYear - 3, maxYear - 2, maxYear - 1, maxYear];
     return last5.map(String);
-  }, [rows]);
+  }, [baseRows]);
 
-  const filtered = useMemo(() => rows.filter((r) => {
+  const filtered = useMemo(() => baseRows.filter((r) => {
     if (selectedAnni.length > 0 && !selectedAnni.includes(r.anno)) return false;
     if (selectedTrimestri.length > 0 && !selectedTrimestri.includes(r.trimestre)) return false;
     if (selectedDivisioni.length > 0 && !selectedDivisioni.includes(r.divisione)) return false;
@@ -258,14 +262,14 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
     if (selectedLinee.length > 0 && !selectedLinee.includes(r.linea)) return false;
     if (selectedMapLocalita && r.localita !== selectedMapLocalita) return false;
     return true;
-  }), [rows, selectedAnni, selectedTrimestri, selectedDivisioni, selectedUM, selectedTipi, selectedStati, selectedLinee, selectedMapLocalita]);
+  }), [baseRows, selectedAnni, selectedTrimestri, selectedDivisioni, selectedUM, selectedTipi, selectedStati, selectedLinee, selectedMapLocalita]);
 
-  // Bar chart: CountNonNull(IW67.Avviso) per IW67.Stato
+  // Bar chart: CountNonNull(IW67.Avviso) per IW67.Stato nell'ordine Power BI
   const barData = useMemo(() => {
     const counts: Record<string, number> = {};
-    STATI_SCADENZA.forEach((s) => { counts[s] = 0; });
-    filtered.forEach((r) => { if (r.stato) counts[r.stato] = (counts[r.stato] ?? 0) + 1; });
-    return STATI_SCADENZA.map((name) => ({ name, count: counts[name] ?? 0 }));
+    STATI_BAR_ORDER.forEach((s) => { counts[s] = 0; });
+    filtered.forEach((r) => { if (r.stato && counts[r.stato] !== undefined) counts[r.stato] = (counts[r.stato] ?? 0) + 1; });
+    return STATI_BAR_ORDER.map((name) => ({ name, count: counts[name] ?? 0 }));
   }, [filtered]);
 
   // cardVisual: Min(IW67.Km.)
@@ -323,7 +327,7 @@ export const PageAvvisiV3V4: React.FC<PageAvvisiV3V4Props> = ({
 
     // Raggruppa i dati per punto/località
     const groups: Record<string, { lat: number; lng: number; count: number; name: string }> = {};
-    rows.forEach((r) => {
+    baseRows.forEach((r) => {
       if (selectedAnni.length > 0 && !selectedAnni.includes(r.anno)) return;
       if (selectedTrimestri.length > 0 && !selectedTrimestri.includes(r.trimestre)) return;
       if (selectedDivisioni.length > 0 && !selectedDivisioni.includes(r.divisione)) return;

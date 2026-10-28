@@ -30,6 +30,7 @@ export const PowerBiTabs: React.FC<PowerBiTabsProps> = ({
     { id: 'drill_v5', label: 'Drill V5' },
     { id: 'abbattimento_codici', label: 'Abbattimento Codici' },
     { id: 'quick_user_guide', label: 'Quick User Guide' },
+    { id: 'data_diagnostic', label: 'Diagnostica Dati' },
   ];
 
   const currentIndex = tabs.findIndex(t => t.id === activeSection);

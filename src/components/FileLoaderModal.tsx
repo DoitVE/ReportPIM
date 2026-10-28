@@ -34,6 +34,7 @@ interface FileLoaderModalProps {
   onLoadDemoData: () => void;
   onClearAllData: () => void;
   onUpdateDataAggiornamento?: (value: string) => void;
+  onUpdateRawRegistry?: (registry: RawRegistry) => void;
   counts: {
     pdm: number;
     avvisi: number;
@@ -131,6 +132,7 @@ export const FileLoaderModal: React.FC<FileLoaderModalProps> = ({
   onLoadDemoData,
   onClearAllData,
   onUpdateDataAggiornamento,
+  onUpdateRawRegistry,
   counts,
 }) => {
   // Registry persistente: permette di caricare i file uno alla volta.
@@ -149,6 +151,9 @@ export const FileLoaderModal: React.FC<FileLoaderModalProps> = ({
   // Ricostruisce tutti i dataset con l'ETL fedele ai codici M e li propaga all'app.
   const rebuild = (newLogs: LogEntry[]) => {
     try {
+      if (onUpdateRawRegistry) {
+        onUpdateRawRegistry({ ...registry });
+      }
       const out = buildAll(registry);
       onUpdatePdm(out.app.pdm);
       onUpdateAvvisi(out.app.avvisi);
@@ -218,6 +223,7 @@ export const FileLoaderModal: React.FC<FileLoaderModalProps> = ({
 
   const handleReset = () => {
     registryRef.current = {};
+    if (onUpdateRawRegistry) onUpdateRawRegistry({});
     onClearAllData();
     setRegistryVersion((v) => v + 1);
     setLogs([

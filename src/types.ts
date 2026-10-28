@@ -118,7 +118,8 @@ export type PowerBiSectionId =
   | 'drill_frequenza_v3v4'
   | 'drill_v5'
   | 'abbattimento_codici'
-  | 'quick_user_guide';
+  | 'quick_user_guide'
+  | 'data_diagnostic';
 
 export interface PdmV5Item {
   pdm: string;

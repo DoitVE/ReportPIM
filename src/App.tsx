@@ -12,7 +12,9 @@ import { PageDrillFrequenzaV3V4 } from './components/pages/PageDrillFrequenzaV3V
 import { PageDrillV5 } from './components/pages/PageDrillV5';
 import { PageAbbaco } from './components/pages/PageAbbaco';
 import { PageQuickUserGuide } from './components/pages/PageQuickUserGuide';
+import { PageDataDiagnostic } from './components/pages/PageDataDiagnostic';
 
+import { RawRegistry } from './etl/pipeline';
 import {
   Avviso,
   AbbacoItem,
@@ -36,6 +38,7 @@ export const App: React.FC = () => {
   const [isFileLoaderOpen, setIsFileLoaderOpen] = useState<boolean>(false);
 
   // Datasets start EMPTY by default as requested: no residual/mock data until files are provided or demo is clicked
+  const [rawRegistry, setRawRegistry] = useState<RawRegistry>({});
   const [pdmList, setPdmList] = useState<PdmV5Item[]>([]);
   const [avvisi, setAvvisi] = useState<Avviso[]>([]);
   const [abbaco, setAbbaco] = useState<AbbacoItem[]>([]);
@@ -64,6 +67,7 @@ export const App: React.FC = () => {
 
   // Reset all datasets to empty
   const handleClearAllData = () => {
+    setRawRegistry({});
     setPdmList([]);
     setAvvisi([]);
     setAbbaco([]);
@@ -98,7 +102,8 @@ export const App: React.FC = () => {
     activeSection === 'drill_frequenza_v3v4' ||
     activeSection === 'drill_v5' ||
     activeSection === 'abbattimento_codici' ||
-    activeSection === 'quick_user_guide';
+    activeSection === 'quick_user_guide' ||
+    activeSection === 'data_diagnostic';
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#18191c] flex flex-col font-sans select-none text-slate-100">
@@ -195,6 +200,21 @@ export const App: React.FC = () => {
         {activeSection === 'quick_user_guide' && (
           <PageQuickUserGuide />
         )}
+
+        {activeSection === 'data_diagnostic' && (
+          <PageDataDiagnostic
+            rawRegistry={rawRegistry}
+            pdmList={pdmList}
+            avvisi={avvisi}
+            abbaco={abbaco}
+            iw67={iw67}
+            controlli={controlli}
+            odl={odl}
+            dataAggiornamento={dataAggiornamento}
+            onOpenFileLoader={() => setIsFileLoaderOpen(true)}
+            onLoadDemoData={handleLoadDemoData}
+          />
+        )}
       </main>
 
       {/* Bottom Tabs matching Power BI Desktop / Service - ALWAYS VISIBLE AT BOTTOM */}
@@ -216,6 +236,7 @@ export const App: React.FC = () => {
         onLoadDemoData={handleLoadDemoData}
         onClearAllData={handleClearAllData}
         onUpdateDataAggiornamento={setDataAggiornamento}
+        onUpdateRawRegistry={setRawRegistry}
         counts={{
           pdm: pdmList.length,
           avvisi: avvisi.length,

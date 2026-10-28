@@ -35,7 +35,7 @@ import {
   qAbbaco,
 } from './queries';
 import { buildMaster } from './master';
-import { lookupGpsCoordinates, extractBaseSede } from '../data/gpsService';
+import { lookupGpsCoordinates, extractBaseSede, gpsLookupTable } from '../data/gpsService';
 import {
   Avviso,
   AbbacoItem,
@@ -131,11 +131,23 @@ function pickSheet(sheets: Record<string, Matrix>, preferred: string[]): Matrix 
  * Aggiunge un file caricato al registry, riconoscendone il tipo dal nome.
  * Restituisce il tipo riconosciuto (o null).
  */
+/**
+ * Aggiunge un file caricato al registry, riconoscendone il tipo dal nome.
+ * Restituisce il tipo riconosciuto (o null).
+ */
 export async function registerFile(file: File, reg: RawRegistry): Promise<SourceKind | null> {
-  // IW29_full è un TXT delimitato TAB (encoding 1252): va letto come testo,
-  // non come workbook Excel.
-  if (detectSource(file.name) === 'iw29_full') {
-    reg.iw29_txt_lines = await readText1252(file);
+  const isIw29 = detectSource(file.name) === 'iw29_full';
+  if (isIw29) {
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf.slice(0, 4));
+    const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
+    if (isZip || file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      const sheets = await readWorkbookSheets(file);
+      reg.iw29_excel = pickSheet(sheets, ['Data', 'IW29', 'Sheet1']) || Object.values(sheets)[0];
+    } else {
+      const text = new TextDecoder('windows-1252').decode(buf);
+      reg.iw29_txt_lines = text.split(/\r?\n/);
+    }
     return 'iw29_full';
   }
 
@@ -209,7 +221,7 @@ export function buildTables(reg: RawRegistry): EtlTables {
     zstmaia1: qZstmaia1Full(reg.zstmaia1_full),
     zstmaia2: qZstmaia2Full(reg.zstmaia2_full),
     zstmaia7: qZstmaia7Combined(vem1, vem2),
-    iw29: qIw29Full(reg.iw29_txt_lines),
+    iw29: qIw29Full(reg.iw29_txt_lines, reg.iw29_excel),
     zavvisi: qZavvisiTxt(reg.zavvisi_txt),
     ik07: qIk07Full(qIk07(reg.ik07_inattivo, false), qIk07(reg.ik07_attivo, true)),
     gps: qGps(reg.gps),
@@ -226,7 +238,7 @@ export function buildTables(reg: RawRegistry): EtlTables {
 
 /** True se sono presenti tutte le sorgenti necessarie alla query master. */
 export function canBuildMaster(reg: RawRegistry): boolean {
-  return !!(reg.zstmaia1_full && (reg.zstmaia2_full || reg.zstmaia7_vem1) && reg.iw29_txt_lines);
+  return !!(reg.zstmaia1_full && (reg.zstmaia2_full || reg.zstmaia7_vem1) && (reg.iw29_txt_lines || reg.iw29_excel));
 }
 
 export function buildAll(reg: RawRegistry): EtlOutput {
@@ -314,15 +326,17 @@ function mapStatoScadenzaV3(codStato: any): Avviso['stato_scadenza'] {
 function mapPdm(r: Row, loTr: Map<string, LoTrInfo>): PdmV5Item {
   const sede = r['Sede_tecnica_definitiva'] ?? r['Tratta'] ?? '';
   const info = loTrLookup(loTr, sede);
+  const baseSede = extractBaseSede(sede);
+  const gpsRec = baseSede ? gpsLookupTable[baseSede] : undefined;
   const linea = info?.linea ?? '';
-  const localita = r['Tratta'] ?? sede;
+  const localita = info?.nomeSede || gpsRec?.desc || r['Tratta'] || sede;
   const km = r['Km linea'] ?? '';
   const c = coords(sede, localita, km, linea);
   const tolto = r[" Tolto d'opera_definitivo"];
 
   return {
     pdm: fmt(r['PdM_definitivo']),
-    data_creazione: fmt(r['IW29_full.Data cr.'] ?? r['Data Agg.']),
+    data_creazione: fmt(r['IK07_full.Data creazione'] ?? r['IW29_full.Data cr.'] ?? r['Data Agg.']),
     data_scoperta: fmt(r['Data Scoperta']),
     tolto_dop: tolto === 'S' ? 'S' : 'N',
     data_tolto_dop: fmt(r["Data tolto d'opera"]),
@@ -331,7 +345,7 @@ function mapPdm(r: Row, loTr: Map<string, LoTrInfo>): PdmV5Item {
     linea,
     osservazioni: fmt(r['Osservazioni_definitivo']),
     avviso: fmt(r['IW29_full.Avviso']),
-    data_creaz_avviso: fmt(r['IW29_full.Data avviso']),
+    data_creaz_avviso: fmt(r['IW29_full.Data avviso'] ?? r['IW29_full.Data cr.']),
     km_linea: fmt(km),
     tipo_difetto: fmt(r['Tipo difetto']),
     pos_difetto: fmt(r['Pos. Dif'] ?? r['ZSTMAIA2_full.Posizione difetto']),
@@ -398,16 +412,19 @@ function mapAvviso(r: Row, loTr: Map<string, LoTrInfo>): Avviso {
   const avviso = r['IW29_full.Avviso'];
   const sede = r['IW29_full.Sede tecnica'] ?? r['Sede_tecnica_definitiva'] ?? '';
   const info = loTrLookup(loTr, sede);
+  const baseSede = extractBaseSede(sede);
+  const gpsRec = baseSede ? gpsLookupTable[baseSede] : undefined;
   const linea = info?.linea ?? '';
   const km = r['Km linea'] ?? '';
-  const c = coords(sede, info?.nomeSede, km, linea);
+  const nomeSede = info?.nomeSede || gpsRec?.desc || '';
+  const c = coords(sede, nomeSede, km, linea);
   return {
     tipo: 'V5',
     avviso: fmt(avviso),
     descrizione: fmt(r['IW29_full.Descrizione']),
     ordine: fmt(r['IW29_full.Ordine']),
     sede_tecnica: fmt(sede),
-    nome_sede: info?.nomeSede ?? '',
+    nome_sede: nomeSede,
     linea,
     divisione: 'VEM1',
     lvu: info?.lvu ?? '',

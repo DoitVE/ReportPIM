@@ -6,6 +6,7 @@
  * replicato per mantenere la tracciabilità 1:1 con l'originale.
  */
 import {
+  Row,
   Table,
   Matrix,
   matrixToIndexedTable,
@@ -34,6 +35,7 @@ import {
   today,
   addDays,
   isBlank,
+  toDate,
 } from './helpers';
 
 /* ------------------------------------------------------------------ */
@@ -46,6 +48,7 @@ export interface SourceFiles {
   zstmaia7_vem1?: Matrix;
   zstmaia7_vem2?: Matrix;
   iw29_txt_lines?: string[];
+  iw29_excel?: Matrix;
   zavvisi_txt?: Matrix;
   ik07_attivo?: Matrix;
   ik07_inattivo?: Matrix;
@@ -339,8 +342,61 @@ export function qIk07Full(inattivo: Table, attivo: Table): Table {
 /* ------------------------------------------------------------------ */
 /* 14) IW29_full (TXT delimitato TAB, encoding 1252)                   */
 /* ------------------------------------------------------------------ */
-export function qIw29Full(lines?: string[]): Table {
-  if (!lines) return [];
+export function qIw29Full(lines?: string[], matrix?: Matrix): Table {
+  if (matrix && matrix.length > 0) {
+    let headerIdx = -1;
+    for (let i = 0; i < Math.min(matrix.length, 10); i++) {
+      const rowStr = (matrix[i] || []).map((c) => String(c ?? '')).join(' ');
+      if (rowStr.includes('Avviso') || rowStr.includes('FineRich.') || rowStr.includes('Sede tecnica')) {
+        headerIdx = i;
+        break;
+      }
+    }
+    if (headerIdx === -1) headerIdx = 0;
+
+    const headers = (matrix[headerIdx] || []).map((c) => String(c ?? '').trim());
+    const table: Table = [];
+
+    for (let i = headerIdx + 1; i < matrix.length; i++) {
+      const row = matrix[i];
+      if (!row || row.length === 0 || row.every((c) => c === null || c === undefined || String(c).trim() === '')) {
+        continue;
+      }
+      const item: Row = {};
+      headers.forEach((h, colIdx) => {
+        if (h) {
+          item[h] = row[colIdx] ?? null;
+        }
+      });
+
+      const dateKeys = ['FineRich.', 'In. rich.', 'Chiusura', 'Data chiusura', 'Data', 'Data avviso', 'Data cr.', 'Mod. il', 'Data modifica', 'Data rif.', 'Dt.rif.cl.'];
+      for (const dk of dateKeys) {
+        if (item[dk] !== undefined && item[dk] !== null) {
+          if (typeof item[dk] === 'string') {
+            item[dk] = item[dk].replace(/\./g, '/');
+          }
+          item[dk] = toDate(item[dk]);
+        }
+      }
+
+      if (item['Chiusura'] !== undefined && item['Data chiusura'] === undefined) {
+        item['Data chiusura'] = item['Chiusura'];
+      }
+      if (item['Data'] !== undefined && item['Data avviso'] === undefined) {
+        item['Data avviso'] = item['Data'];
+      }
+      if (item['Mod. il'] !== undefined && item['Data modifica'] === undefined) {
+        item['Data modifica'] = item['Mod. il'];
+      }
+
+      if (!isBlank(item['Avviso'])) {
+        table.push(item);
+      }
+    }
+    if (table.length > 0) return table;
+  }
+
+  if (!lines || lines.length === 0) return [];
   let t: Table = lines.map((l) => ({ Column1: l }));
   t = transformColumnTypes(t, { Column1: 'text' });
   t = skipRows(t, 3);
